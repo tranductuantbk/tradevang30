@@ -1,5 +1,4 @@
 streamlit
-streamlit-tradingview-chart
 pandas
 pandas-ta
 yfinance
