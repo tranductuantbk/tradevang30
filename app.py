@@ -1,41 +1,51 @@
 import streamlit as st
-from streamlit_tradingview_chart import build_chart # Thư viện hỗ trợ TV Chart
-import pandas as pd
-from utils.ai_engine import analyze_market
+import streamlit.components.v1 as components
 
 st.set_page_config(layout="wide", page_title="AI Gold Trading Terminal")
 
-# --- SIDEBAR (Dữ liệu ngầm tự cập nhật) ---
-st.sidebar.title("📡 System Modules Status")
-# Giả sử các module đã ghi dữ liệu vào session_state
-indicator_data = st.session_state.get('tech_indicators', "Đang tải...")
-macro_data = st.session_state.get('macro_info', "Đang tải...")
-flow_data = st.session_state.get('money_flow', "Đang tải...")
+# --- Hàm tạo biểu đồ TradingView chuẩn ---
+def render_tradingview_chart(symbol="OANDA:XAUUSD", interval="30"):
+    html_code = f"""
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container" style="height:100%;width:100%">
+      <div id="tradingview_gold" style="height:600px;width:100%"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget(
+      {{
+      "autosize": true,
+      "symbol": "{symbol}",
+      "interval": "{interval}",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "theme": "dark",
+      "style": "1",
+      "locale": "vi_VN",
+      "enable_publishing": false,
+      "backgroundColor": "rgba(0, 0, 0, 1)",
+      "allow_symbol_change": true,
+      "container_id": "tradingview_gold"
+    }}
+      );
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
+    """
+    # Chiều cao của components phải tương xứng với chiều cao thẻ div bên trên
+    components.html(html_code, height=600)
 
 # --- MAIN SECTION ---
 col_chart, col_ai = st.columns([2, 1])
 
 with col_chart:
     st.subheader("XAU/USD Live Chart")
-    timeframe = st.selectbox("Timeframe", ["30m", "1h", "4h", "1d"], index=0)
     
-    # Tích hợp biểu đồ TradingView chuyên nghiệp
-    # Lưu ý: Cần cài đặt streamlit-tradingview-chart
-    build_chart(symbol="OANDA:XAU_USD", interval=timeframe)
+    # Nút chọn khung thời gian
+    timeframe_map = {"30m": "30", "1h": "60", "4h": "240", "1d": "D"}
+    selected_tf = st.selectbox("Khung thời gian", options=list(timeframe_map.keys()), index=0)
+    
+    # Gọi hàm hiển thị biểu đồ
+    render_tradingview_chart(symbol="OANDA:XAUUSD", interval=timeframe_map[selected_tf])
 
 with col_ai:
     st.subheader("🤖 AI Strategist")
-    if st.button("🚀 Đọc & Phân tích toàn bộ Module"):
-        with st.spinner("AI đang tổng hợp dữ liệu vĩ mô, dòng tiền và chỉ báo..."):
-            # Gửi tất cả dữ liệu từ session_state cho AI
-            context = {
-                "indicators": indicator_data,
-                "macro": macro_data,
-                "flow": flow_data,
-                "current_price": "23xx.x" 
-            }
-            analysis_result = analyze_market(context)
-            st.markdown(analysis_result)
-            
-            # Lưu phân tích này vào Neon DB để theo dõi sau
-            # save_to_neon(analysis_result)
+    st.info("Khu vực AI sẽ đọc dữ liệu từ các module...")
