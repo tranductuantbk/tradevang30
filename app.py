@@ -1,50 +1,9 @@
 import streamlit as st
-import streamlit.components.v1 as components
 
-# Cài đặt cấu hình trang phải luôn nằm ở dòng đầu tiên của Streamlit
-st.set_page_config(layout="wide", page_title="AI Gold Trading Terminal", page_icon="📈")
+# Cài đặt cấu hình trang
+st.set_page_config(layout="wide", page_title="AI Gold Trading Terminal", page_icon="⚡")
 
-# --- 1. HÀM TẠO BIỂU ĐỒ TRADINGVIEW ---
-def render_tradingview_chart(symbol="OANDA:XAUUSD", interval="30"):
-    """
-    Nhúng trực tiếp Widget của TradingView bằng HTML/JS.
-    Cách này siêu nhẹ, mượt và không bị lỗi ModuleNotFoundError trên server.
-    """
-    html_code = f"""
-    <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container" style="height:100%;width:100%">
-      <div id="tradingview_gold" style="height:650px;width:100%"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-      <script type="text/javascript">
-      new TradingView.widget(
-      {{
-      "autosize": true,
-      "symbol": "{symbol}",
-      "interval": "{interval}",
-      "timezone": "Asia/Ho_Chi_Minh",
-      "theme": "dark",
-      "style": "1",
-      "locale": "vi_VN",
-      "enable_publishing": false,
-      "backgroundColor": "#131722",
-      "gridColor": "#1f293d",
-      "hide_top_toolbar": false,
-      "hide_legend": false,
-      "save_image": false,
-      "container_id": "tradingview_gold",
-      "studies": [
-        "Volume@tv-basicstudies"
-      ]
-    }}
-      );
-      </script>
-    </div>
-    <!-- TradingView Widget END -->
-    """
-    # Render HTML với chiều cao tương ứng
-    components.html(html_code, height=650)
-
-# --- 2. SIDEBAR: KIỂM TRA TRẠNG THÁI MODULE CHẠY NGẦM ---
+# --- 1. SIDEBAR: KIỂM TRA TRẠNG THÁI MODULE CHẠY NGẦM ---
 st.sidebar.title("📡 System Status")
 st.sidebar.markdown("Trạng thái dữ liệu từ các Module:")
 
@@ -57,54 +16,59 @@ st.sidebar.success("Trạng thái Chỉ báo: OK" if "⚠️" not in indicator_d
 st.sidebar.warning("Trạng thái Vĩ mô: Trống" if "⚠️" in macro_data else "Trạng thái Vĩ mô: OK")
 st.sidebar.warning("Trạng thái Dòng tiền: Trống" if "⚠️" in flow_data else "Trạng thái Dòng tiền: OK")
 
-
-# --- 3. GIAO DIỆN CHÍNH (MAIN LAYOUT) ---
-st.title("⚡ Quant Trading Hub - XAU/USD")
+# --- 2. GIAO DIỆN CHÍNH (DÀNH CHO DỮ LIỆU & AI) ---
+st.title("⚡ Quant Trading Hub - AI Strategist")
+st.markdown("Hệ thống tự động tổng hợp dữ liệu từ các module chạy ngầm và đưa ra phân tích bối cảnh.")
 st.markdown("---")
 
-# Chia màn hình thành 2 cột: Biểu đồ (tỷ lệ 7) và AI (tỷ lệ 3)
-col_chart, col_ai = st.columns([7, 3])
+# Chia 3 cột để hiển thị tóm tắt dữ liệu mà AI sẽ đọc
+col1, col2, col3 = st.columns(3)
 
-with col_chart:
-    # Nút chọn khung thời gian đặt ở trên cùng biểu đồ
-    timeframe_map = {"M30": "30", "H1": "60", "H4": "240", "D1": "D"}
-    selected_tf = st.radio(
-        "Khung thời gian:", 
-        options=list(timeframe_map.keys()), 
-        index=0, 
-        horizontal=True
-    )
-    
-    # Hiển thị biểu đồ
-    render_tradingview_chart(symbol="OANDA:XAUUSD", interval=timeframe_map[selected_tf])
+with col1:
+    st.subheader("📊 Chỉ báo Kỹ thuật")
+    st.info(indicator_data)
 
-with col_ai:
-    st.subheader("🤖 AI Strategist")
-    st.markdown("Hệ thống tự động đọc dữ liệu từ các module bên ngoài và phân tích bối cảnh.")
-    
-    # Nút kích hoạt AI
-    if st.button("🚀 Thực thi Phân tích Toàn diện", use_container_width=True, type="primary"):
-        with st.spinner("Đang tổng hợp dữ liệu Chỉ báo, Vĩ mô và Dòng tiền..."):
+with col2:
+    st.subheader("🌍 Dữ liệu Vĩ mô")
+    st.info(macro_data)
+
+with col3:
+    st.subheader("🐋 Dòng tiền (Smart Money)")
+    st.info(flow_data)
+
+st.markdown("---")
+
+# --- 3. KHU VỰC AI ĐÁNH GIÁ VÀ VÀO LỆNH ---
+st.subheader("🤖 Phân tích bối cảnh & Gợi ý")
+
+# Nút kích hoạt AI
+if st.button("🚀 Kích hoạt AI Phân tích Toàn diện", use_container_width=True, type="primary"):
+    with st.spinner("AI đang xử lý dữ liệu từ các module và tìm kiếm điểm vào lệnh..."):
+        
+        # --- TẠI ĐÂY BẠN SẼ GẮN API (OpenAI/Gemini) ĐỂ XỬ LÝ LOGIC ---
+        # Dưới đây là demo nội dung AI trả về sau khi phân tích dữ liệu trên
+        
+        st.success("""
+        💡 **Đánh giá từ AI:** 
+        Dựa trên dữ liệu hội tụ hiện tại:
+        - VSA trên M30 cho thấy khối lượng cạn kiệt ở nhịp giảm (No Supply).
+        - Dòng tiền lớn chưa có dấu hiệu phân phối mạnh.
+        - **Khuyến nghị:** Cấu trúc thuận lợi để canh BUY.
+        """)
+        
+        # Form nhập lệnh nhanh (Nằm ngay dưới kết quả phân tích)
+        st.markdown("### ⚡ Cài đặt Lệnh / Lưu Nhật ký")
+        
+        # Dùng container để bọc các input cho gọn gàng
+        with st.container():
+            col_entry, col_sl, col_btn = st.columns([2, 2, 2])
             
-            # --- TẠI ĐÂY SẼ GỌI HÀM OPENAI HOẶC GEMINI API ---
-            # Để demo, tôi hiển thị luôn dữ liệu mà AI sẽ "nhìn thấy"
-            st.markdown("### Dữ liệu AI nhận được:")
-            
-            with st.expander("1. Chỉ báo Kỹ thuật", expanded=True):
-                st.write(indicator_data)
-                
-            with st.expander("2. Dữ liệu Vĩ mô"):
-                st.write(macro_data)
-                
-            with st.expander("3. Dòng tiền (Smart Money)"):
-                st.write(flow_data)
-                
-            st.info("💡 Lời khuyên từ AI: Dựa trên VSA khung M30, hiện tại khối lượng đang cạn kiệt tại vùng Hỗ trợ. Chờ đợi xác nhận một cây nến Cầu (Demand) đẩy lên mạnh để vào lệnh Buy.")
-            
-            # Form nhập lệnh nhanh
-            st.markdown("---")
-            st.markdown("### ⚡ Cài đặt Lệnh Nhanh")
-            entry = st.number_input("Entry", value=2350.00, step=0.1)
-            sl = st.number_input("Stoploss", value=2345.00, step=0.1)
-            if st.button("Lưu Nhật ký (Neon DB)"):
-                st.success(f"Đã lưu lệnh Buy Limit tại {entry}, SL: {sl} vào cơ sở dữ liệu.")
+            with col_entry:
+                entry = st.number_input("Giá Entry", value=2350.00, step=0.1)
+            with col_sl:
+                sl = st.number_input("Giá Stoploss", value=2345.00, step=0.1)
+            with col_btn:
+                st.write("") # Dòng trống để đẩy nút bấm thấp xuống ngang hàng với input
+                st.write("")
+                if st.button("Lưu vào Neon DB", use_container_width=True):
+                    st.success(f"Đã lưu nhật ký: Canh Buy quanh {entry}, Stoploss tại {sl}!")
