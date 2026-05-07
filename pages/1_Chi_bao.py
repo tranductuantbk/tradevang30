@@ -22,25 +22,34 @@ tf_mapping = {
 
 st.title("⚙️ Trung tâm Quản lý Chỉ Báo Cá Nhân")
 
-col_text, col_tf = st.columns([3, 1])
+# Tạo giao diện nhập Mã và Khung thời gian
+col_text, col_ticker, col_tf = st.columns([2, 1, 1])
 with col_text:
-    st.markdown("Hệ thống tự động nhận diện các file code chỉ báo của bạn trong thư mục `custom_indicators`.")
+    st.markdown("Hệ thống tự động quét và tính toán chỉ báo từ thư mục `custom_indicators`.")
+with col_ticker:
+    # Gắn ô nhập mã giao dịch (Mặc định là XAUUSD=X cho Vàng Giao ngay)
+    selected_ticker = st.text_input("📈 Mã giao dịch (Yahoo Finance):", value="XAUUSD=X")
 with col_tf:
     selected_tf_label = st.selectbox("⏳ Khung Thời Gian:", list(tf_mapping.keys()), index=1)
 
 st.markdown("---")
 
 # =====================================================================
-# 2. HÀM TẢI DỮ LIỆU ĐỘNG
+# 2. HÀM TẢI DỮ LIỆU ĐỘNG (ĐÃ FIX LỖI "LÀM NÓNG" CHỈ BÁO)
 # =====================================================================
 selected_interval = tf_mapping[selected_tf_label]["interval"]
-selected_period = tf_mapping[selected_tf_label]["period"]
 
-@st.cache_data(ttl=60) # Rút ngắn cache xuống 60s để update liên tục
-def get_data(interval, period):
-    return yf.download("GC=F", period=period, interval=interval)
+# Fix: ÉP HỆ THỐNG TẢI 60 NGÀY (60d) cho khung M15/M30/H1 để lấy đủ nến tính EMA 50
+if selected_interval in ["15m", "30m", "60m"]:
+    fetch_period = "60d" 
+else:
+    fetch_period = tf_mapping[selected_tf_label]["period"]
 
-df = get_data(selected_interval, selected_period)
+@st.cache_data(ttl=60) # Cập nhật dữ liệu mới mỗi phút
+def get_data(ticker, interval, period):
+    return yf.download(ticker, period=period, interval=interval)
+
+df = get_data(selected_ticker, selected_interval, fetch_period)
 
 # =====================================================================
 # 3. HỆ THỐNG RADAR QUÉT CHỈ BÁO
@@ -84,11 +93,14 @@ if not df.empty:
     st.subheader("🤖 Dữ liệu gói gửi AI Strategist")
     
     if len(active_summaries) > 0:
-        final_summary = f"📊 [BỐI CẢNH KHUNG {selected_tf_label}]\n" + "\n".join([f"- {text}" for text in active_summaries])
+        # Gắn thêm nhãn KHUNG THỜI GIAN VÀ MÃ TÀI SẢN để AI biết chính xác
+        final_summary = f"📊 [BỐI CẢNH MÃ {selected_ticker} - KHUNG {selected_tf_label}]\n" + "\n".join([f"- {text}" for text in active_summaries])
         st.info(final_summary)
+        
+        # Lưu dữ liệu vào hệ thống cho Trang Chính gọi ra
         st.session_state['tech_indicators'] = final_summary
     else:
         st.warning("Bạn chưa bật chỉ báo nào hoặc chưa có code thành công.")
         st.session_state['tech_indicators'] = "⚠️ Không có dữ liệu."
 else:
-    st.error("Không tải được dữ liệu từ Yahoo Finance. Vui lòng kiểm tra lại kết nối.")
+    st.error(f"Không tải được dữ liệu cho mã '{selected_ticker}'. Vui lòng kiểm tra lại kết nối hoặc mã giao dịch bạn nhập.")
