@@ -18,12 +18,10 @@ tf_mapping = {
 st.title("⚙️ Engine Phân Tích Chỉ Báo")
 
 col_t, col_m, col_f = st.columns([2, 1, 1])
-with col_m: selected_ticker = st.text_input("📈 Mã YFinance:", value="XAUUSD=X")
+# Đã đổi giá trị mặc định thành GC=F (Hợp đồng tương lai Vàng)
+with col_m: selected_ticker = st.text_input("📈 Mã YFinance:", value="GC=F")
 with col_f: selected_tf = st.selectbox("⏳ Khung thời gian:", list(tf_mapping.keys()), index=1)
 
-# ==========================================================
-# CHIẾN THUẬT MỚI: DÙNG CLASS "TICKER" ĐỂ NÉ TƯỜNG LỬA
-# ==========================================================
 @st.cache_data(ttl=60)
 def load_data(ticker, interval, period):
     try:
@@ -41,7 +39,7 @@ def load_data(ticker, interval, period):
     except Exception as e: 
         return pd.DataFrame(), str(e)
 
-# Chạy hàm tải dữ liệu và lấy thông báo lỗi (nếu có)
+# Chạy hàm tải dữ liệu và lấy thông báo lỗi
 df, error_msg = load_data(selected_ticker, tf_mapping[selected_tf]["interval"], tf_mapping[selected_tf]["period"])
 
 if not df.empty:
@@ -72,6 +70,5 @@ if not df.empty:
         st.info(summary)
         st.session_state['tech_indicators'] = summary
 else:
-    # HIỂN THỊ TRỰC TIẾP LÝ DO LỖI RA MÀN HÌNH ĐỂ BẮT BỆNH
     st.error(f"❌ Lỗi truy xuất dữ liệu: {error_msg}")
-    st.warning("💡 Gợi ý: Hãy thử xóa mã XAUUSD=X, gõ lại GC=F (Hợp đồng tương lai Vàng) và nhấn Enter xem Yahoo có nhả dữ liệu không.")
+    st.warning("💡 Gợi ý: Hãy thử đổi mã khác nếu IP bị chặn tạm thời.")
