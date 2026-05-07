@@ -3,8 +3,11 @@ import pandas as pd
 import yfinance as yf
 import os
 import importlib.util
+from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Module Chỉ Báo Tự Động", layout="wide")
+# Tự động load lại trang sau mỗi 60,000 mili-giây (1 phút)
+st_autorefresh(interval=60000, key="chibao_refresh")
 
 # =====================================================================
 # 1. TỪ ĐIỂN KHUNG THỜI GIAN (Dành cho Yahoo Finance)
@@ -35,7 +38,7 @@ selected_interval = tf_mapping[selected_tf_label]["interval"]
 selected_period = tf_mapping[selected_tf_label]["period"]
 
 # Thêm tham số vào hàm để cache dữ liệu riêng biệt cho từng khung
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def get_data(interval, period):
     return yf.download("GC=F", period=period, interval=interval)
 
