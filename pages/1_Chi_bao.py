@@ -39,7 +39,7 @@ st.markdown("---")
 # =====================================================================
 selected_interval = tf_mapping[selected_tf_label]["interval"]
 
-# Fix: ÉP HỆ THỐNG TẢI 60 NGÀY (60d) cho khung M15/M30/H1 để lấy đủ nến tính EMA 50
+# Fix: Đổi từ 60d xuống 59d để lách luật giới hạn API của Yahoo Finance
 if selected_interval in ["15m", "30m", "60m"]:
     fetch_period = "59d" 
 else:
