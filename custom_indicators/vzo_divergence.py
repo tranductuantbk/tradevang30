@@ -1,99 +1,146 @@
-import streamlit as st
 import pandas as pd
-import yfinance as yf
-import os
-import importlib.util
+import numpy as np
 
-st.set_page_config(page_title="Module Chỉ Báo Tự Động", layout="wide")
-
-# =====================================================================
-# 1. TỪ ĐIỂN KHUNG THỜI GIAN (Dành cho Yahoo Finance)
-# =====================================================================
-tf_mapping = {
-    "M15 (15 Phút)": {"interval": "15m", "period": "5d"},
-    "M30 (30 Phút)": {"interval": "30m", "period": "5d"},
-    "H1 (1 Giờ)": {"interval": "60m", "period": "1mo"},
-    "D1 (1 Ngày)": {"interval": "1d", "period": "2y"}
-}
-
-st.title("⚙️ Trung tâm Quản lý Chỉ Báo Cá Nhân")
-
-# Tạo giao diện chọn Khung thời gian gọn gàng ở góc
-col_text, col_tf = st.columns([3, 1])
-with col_text:
-    st.markdown("Hệ thống tự động nhận diện các file code chỉ báo của bạn trong thư mục `custom_indicators`.")
-with col_tf:
-    # Mặc định index=1 tức là chọn M30
-    selected_tf_label = st.selectbox("⏳ Khung Thời Gian:", list(tf_mapping.keys()), index=1)
-
-st.markdown("---")
-
-# =====================================================================
-# 2. HÀM TẢI DỮ LIỆU ĐỘNG THEO KHUNG THỜI GIAN
-# =====================================================================
-selected_interval = tf_mapping[selected_tf_label]["interval"]
-selected_period = tf_mapping[selected_tf_label]["period"]
-
-# Thêm tham số vào hàm để cache dữ liệu riêng biệt cho từng khung
-@st.cache_data(ttl=300)
-def get_data(interval, period):
-    return yf.download("GC=F", period=period, interval=interval)
-
-df = get_data(selected_interval, selected_period)
-
-# =====================================================================
-# 3. HỆ THỐNG RADAR QUÉT CHỈ BÁO
-# =====================================================================
-if not df.empty:
-    col1, col2 = st.columns([1, 2])
+def run_indicator(df):
+    # ----------------------------------------------------------------------
+    # 1. CÀI ĐẶT THÔNG SỐ 
+    # ----------------------------------------------------------------------
+    vzo_length = 14
+    vzo_noise = 4
+    pivot_left = 5
+    pivot_right = 5
+    max_bars = 60
     
-    active_summaries = [] 
+    d = df.copy()
     
-    with col1:
-        st.subheader("🛠️ Kho Chỉ Báo Của Bạn")
+    # Ép dữ liệu về 1 chiều (1D) chắc chắn 100%
+    def get_1d(col_name):
+        col = d[col_name]
+        if isinstance(col, pd.DataFrame):
+            return col.iloc[:, 0]
+        return col
+
+    close_series = get_1d('Close')
+    volume_series = get_1d('Volume')
+    high_series = get_1d('High')
+    low_series = get_1d('Low')
+    
+    # ----------------------------------------------------------------------
+    # 2. TÍNH TOÁN VZO
+    # ----------------------------------------------------------------------
+    direction = volume_series.copy()
+    direction[close_series <= close_series.shift(1)] = -volume_series
+    
+    vzo_volume = direction.ewm(span=vzo_length, adjust=False).mean()
+    total_volume = volume_series.ewm(span=vzo_length, adjust=False).mean()
+    
+    raw_vzo = pd.Series(0.0, index=d.index)
+    mask = total_volume != 0
+    raw_vzo[mask] = 100 * (vzo_volume[mask] / total_volume[mask])
+    
+    d['VZO'] = raw_vzo.ewm(span=vzo_noise, adjust=False).mean()
+    
+    # ----------------------------------------------------------------------
+    # 3. TÌM PIVOT BẰNG SỐ THỨ TỰ VẬT LÝ (TRÁNH LỖI DUPLICATE INDEX)
+    # ----------------------------------------------------------------------
+    window_size = pivot_left + pivot_right + 1
+    
+    d['VZO_Max'] = d['VZO'].rolling(window=window_size, center=True).max()
+    d['VZO_Min'] = d['VZO'].rolling(window=window_size, center=True).min()
+    
+    d['Is_Pivot_High'] = (d['VZO'] == d['VZO_Max'])
+    d['Is_Pivot_Low']  = (d['VZO'] == d['VZO_Min'])
+    
+    # Lấy vị trí index chính xác của các điểm Pivot
+    pivot_high_indices = np.where(d['Is_Pivot_High'])[0]
+    pivot_low_indices  = np.where(d['Is_Pivot_Low'])[0]
+    
+    # ----------------------------------------------------------------------
+    # 4. HÀM KIỂM CHỨNG GIAO ĐIỂM
+    # ----------------------------------------------------------------------
+    def check_validation(idx_start, idx_end, is_high):
+        bars_diff = idx_end - idx_start
+        if bars_diff > max_bars or bars_diff < 5:
+            return False
         
-        folder_path = "custom_indicators"
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
+        start_val = float(d['VZO'].iloc[idx_start])
+        end_val = float(d['VZO'].iloc[idx_end])
+        slope = (end_val - start_val) / float(bars_diff)
+        
+        for i in range(1, bars_diff):
+            line_val = start_val + (slope * i)
+            current_vzo = float(d['VZO'].iloc[idx_start + i])
+            if is_high and current_vzo > line_val:
+                return False
+            if not is_high and current_vzo < line_val:
+                return False
+        return True
+
+    # ----------------------------------------------------------------------
+    # 5. TÌM PHÂN KỲ GẦN NHẤT
+    # ----------------------------------------------------------------------
+    div_status = "Không phát hiện phân kỳ."
+    
+    # Phân kỳ Đáy (Bullish)
+    if len(pivot_low_indices) >= 2:
+        idx1 = pivot_low_indices[-1] # Vị trí nến hiện tại
+        idx2 = pivot_low_indices[-2] # Vị trí nến trước đó
+        
+        if check_validation(idx2, idx1, False):
+            vzo1 = float(d['VZO'].iloc[idx1])
+            vzo2 = float(d['VZO'].iloc[idx2])
+            price1 = float(low_series.iloc[idx1])
+            price2 = float(low_series.iloc[idx2])
             
-        indicator_files = [f for f in os.listdir(folder_path) if f.endswith('.py') and f != '__init__.py']
-        
-        if len(indicator_files) == 0:
-            st.info(f"📂 Thư mục `{folder_path}` đang trống. Hãy thả các file code của bạn vào đây.")
-        else:
-            for file_name in indicator_files:
-                module_name = file_name.replace('.py', '') 
-                
-                is_active = st.checkbox(f"Hoạt động: {module_name}", value=True)
-                
-                if is_active:
-                    with col2:
-                        try:
-                            file_path = os.path.join(folder_path, file_name)
-                            spec = importlib.util.spec_from_file_location(module_name, file_path)
-                            custom_module = importlib.util.module_from_spec(spec)
-                            spec.loader.exec_module(custom_module)
-                            
-                            # Truyền df mới vào hàm tính toán
-                            result_text = custom_module.run_indicator(df)
-                            
-                            st.success(f"✅ Đã chạy thành công: `{file_name}`")
-                            active_summaries.append(result_text)
-                            
-                        except Exception as e:
-                            st.error(f"❌ Lỗi code trong file `{file_name}`: {e}")
+            if price1 < price2 and vzo1 > vzo2:
+                bars_ago = len(d) - 1 - idx1
+                div_status = f"Phân kỳ Thường (Regular Bullish) - ĐẢO CHIỀU TĂNG ({bars_ago} nến trước)."
+            elif price1 > price2 and vzo1 < vzo2:
+                bars_ago = len(d) - 1 - idx1
+                div_status = f"Phân kỳ Ẩn (Hidden Bullish) - TIẾP TỤC TĂNG ({bars_ago} nến trước)."
 
-    st.markdown("---")
-    st.subheader("🤖 Dữ liệu gói gửi AI Strategist")
+    # Phân kỳ Đỉnh (Bearish)
+    if len(pivot_high_indices) >= 2 and "Không" in div_status:
+        idx1 = pivot_high_indices[-1]
+        idx2 = pivot_high_indices[-2]
+        
+        if check_validation(idx2, idx1, True):
+            vzo1 = float(d['VZO'].iloc[idx1])
+            vzo2 = float(d['VZO'].iloc[idx2])
+            price1 = float(high_series.iloc[idx1])
+            price2 = float(high_series.iloc[idx2])
+            
+            if price1 > price2 and vzo1 < vzo2:
+                bars_ago = len(d) - 1 - idx1
+                div_status = f"Phân kỳ Thường (Regular Bearish) - ĐẢO CHIỀU GIẢM ({bars_ago} nến trước)."
+            elif price1 < price2 and vzo1 > vzo2:
+                bars_ago = len(d) - 1 - idx1
+                div_status = f"Phân kỳ Ẩn (Hidden Bearish) - TIẾP TỤC GIẢM ({bars_ago} nến trước)."
+
+    # ----------------------------------------------------------------------
+    # 6. DỊCH VÙNG VZO & ĐÓNG GÓI GỬI AI
+    # ----------------------------------------------------------------------
+    current_vzo = float(d['VZO'].iloc[-1])
     
-    if len(active_summaries) > 0:
-        # Gắn thêm nhãn KHUNG THỜI GIAN vào trước đoạn text để AI biết
-        final_summary = f"📊 [BỐI CẢNH KHUNG {selected_tf_label}]\n" + "\n".join([f"- {text}" for text in active_summaries])
-        
-        st.info(final_summary)
-        
-        # Lưu vào bộ nhớ chung
-        st.session_state['tech_indicators'] = final_summary
+    if current_vzo > 60:
+        zone_status = "Quá mua mạnh (Phân phối)"
+    elif current_vzo > 40:
+        zone_status = "Quá mua"
+    elif current_vzo > 15:
+        zone_status = "Vùng Tăng (Phe Mua kiểm soát)"
+    elif current_vzo > -15:
+        zone_status = "Vùng Nhiễu (Đi ngang)"
+    elif current_vzo > -40:
+        zone_status = "Vùng Giảm (Phe Bán kiểm soát)"
+    elif current_vzo > -60:
+        zone_status = "Quá bán"
     else:
-        st.warning("Bạn chưa bật chỉ báo nào hoặc chưa có code thành công.")
-        st.session_state['tech_indicators'] = "⚠️ Không có dữ liệu."
+        zone_status = "Quá bán mạnh (Cạn cung)"
+        
+    text_for_ai = (
+        f"Chỉ báo VZO Divergence Pro:\n"
+        f"  + Mức VZO hiện tại: {current_vzo:.2f} -> Nằm trong {zone_status}.\n"
+        f"  + Trạng thái Phân kỳ: {div_status}"
+    )
+    
+    return text_for_ai
