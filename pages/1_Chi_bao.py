@@ -6,11 +6,12 @@ import importlib.util
 from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Module Chỉ Báo Tự Động", layout="wide")
-# Tự động load lại trang sau mỗi 60,000 mili-giây (1 phút)
+
+# Tự động refresh sau mỗi 60 giây (60000ms)
 st_autorefresh(interval=60000, key="chibao_refresh")
 
 # =====================================================================
-# 1. TỪ ĐIỂN KHUNG THỜI GIAN (Dành cho Yahoo Finance)
+# 1. TỪ ĐIỂN KHUNG THỜI GIAN
 # =====================================================================
 tf_mapping = {
     "M15 (15 Phút)": {"interval": "15m", "period": "5d"},
@@ -21,24 +22,21 @@ tf_mapping = {
 
 st.title("⚙️ Trung tâm Quản lý Chỉ Báo Cá Nhân")
 
-# Tạo giao diện chọn Khung thời gian gọn gàng ở góc
 col_text, col_tf = st.columns([3, 1])
 with col_text:
     st.markdown("Hệ thống tự động nhận diện các file code chỉ báo của bạn trong thư mục `custom_indicators`.")
 with col_tf:
-    # Mặc định index=1 tức là chọn M30
     selected_tf_label = st.selectbox("⏳ Khung Thời Gian:", list(tf_mapping.keys()), index=1)
 
 st.markdown("---")
 
 # =====================================================================
-# 2. HÀM TẢI DỮ LIỆU ĐỘNG THEO KHUNG THỜI GIAN
+# 2. HÀM TẢI DỮ LIỆU ĐỘNG
 # =====================================================================
 selected_interval = tf_mapping[selected_tf_label]["interval"]
 selected_period = tf_mapping[selected_tf_label]["period"]
 
-# Thêm tham số vào hàm để cache dữ liệu riêng biệt cho từng khung
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=60) # Rút ngắn cache xuống 60s để update liên tục
 def get_data(interval, period):
     return yf.download("GC=F", period=period, interval=interval)
 
@@ -49,7 +47,6 @@ df = get_data(selected_interval, selected_period)
 # =====================================================================
 if not df.empty:
     col1, col2 = st.columns([1, 2])
-    
     active_summaries = [] 
     
     with col1:
@@ -66,7 +63,6 @@ if not df.empty:
         else:
             for file_name in indicator_files:
                 module_name = file_name.replace('.py', '') 
-                
                 is_active = st.checkbox(f"Hoạt động: {module_name}", value=True)
                 
                 if is_active:
@@ -77,9 +73,7 @@ if not df.empty:
                             custom_module = importlib.util.module_from_spec(spec)
                             spec.loader.exec_module(custom_module)
                             
-                            # Truyền df mới vào hàm tính toán
                             result_text = custom_module.run_indicator(df)
-                            
                             st.success(f"✅ Đã chạy thành công: `{file_name}`")
                             active_summaries.append(result_text)
                             
@@ -90,13 +84,11 @@ if not df.empty:
     st.subheader("🤖 Dữ liệu gói gửi AI Strategist")
     
     if len(active_summaries) > 0:
-        # Gắn thêm nhãn KHUNG THỜI GIAN vào trước đoạn text để AI biết
         final_summary = f"📊 [BỐI CẢNH KHUNG {selected_tf_label}]\n" + "\n".join([f"- {text}" for text in active_summaries])
-        
         st.info(final_summary)
-        
-        # Lưu vào bộ nhớ chung
         st.session_state['tech_indicators'] = final_summary
     else:
         st.warning("Bạn chưa bật chỉ báo nào hoặc chưa có code thành công.")
         st.session_state['tech_indicators'] = "⚠️ Không có dữ liệu."
+else:
+    st.error("Không tải được dữ liệu từ Yahoo Finance. Vui lòng kiểm tra lại kết nối.")
