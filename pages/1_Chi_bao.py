@@ -4,6 +4,7 @@ import yfinance as yf
 import os
 import importlib.util
 from streamlit_autorefresh import st_autorefresh
+import requests # Thêm thư viện giả lập kết nối
 
 st.set_page_config(page_title="Module Chỉ Báo", layout="wide")
 st_autorefresh(interval=60000, key="live_refresh")
@@ -21,15 +22,30 @@ col_t, col_m, col_f = st.columns([2, 1, 1])
 with col_m: selected_ticker = st.text_input("📈 Mã YFinance:", value="XAUUSD=X")
 with col_f: selected_tf = st.selectbox("⏳ Khung thời gian:", list(tf_mapping.keys()), index=1)
 
+# ==========================================================
+# HÀM TẢI DỮ LIỆU ĐÃ ĐƯỢC LẮP "MẶT NẠ" VƯỢT TƯỜNG LỬA
+# ==========================================================
 @st.cache_data(ttl=60)
 def load_data(ticker, interval, period):
     try:
-        data = yf.download(ticker, period=period, interval=interval, progress=False)
+        # 1. Tạo một phiên kết nối giả lập trình duyệt Chrome trên Windows
+        session = requests.Session()
+        session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+        })
+        
+        # 2. Ép yfinance sử dụng phiên kết nối giả lập này
+        data = yf.download(ticker, period=period, interval=interval, session=session, progress=False)
         return data
-    except: return pd.DataFrame()
+    except Exception as e: 
+        print(f"Lỗi tải dữ liệu: {e}") # In lỗi ngầm để dễ kiểm tra trên Terminal
+        return pd.DataFrame()
 
 df = load_data(selected_ticker, tf_mapping[selected_tf]["interval"], tf_mapping[selected_tf]["period"])
 
+# ==========================================================
+# KHU VỰC QUÉT CHỈ BÁO BÊN DƯỚI (Giữ nguyên)
+# ==========================================================
 if not df.empty:
     col_left, col_right = st.columns([1, 2])
     active_summaries = []
@@ -58,4 +74,4 @@ if not df.empty:
         st.info(summary)
         st.session_state['tech_indicators'] = summary
 else:
-    st.error("❌ Không tải được dữ liệu. Kiểm tra mã giao dịch hoặc API Yahoo Finance.")
+    st.error("❌ Không tải được dữ liệu. Yahoo Finance có thể đang bảo trì hoặc chặn kết nối. Hãy thử đổi mã thành GC=F.")
