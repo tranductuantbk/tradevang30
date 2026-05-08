@@ -19,9 +19,9 @@ tf_mapping = {
 st.title("⚙️ Engine Phân Tích Chỉ Báo (Bản API Chuyên Nghiệp)")
 
 # ======================================================================
-# ĐIỀN API KEY CỦA BẠN VÀO GIỮA 2 DẤU NGOẶC KÉP Ở DÒNG DƯỚI ĐÂY
+# QUAN TRỌNG: Hãy điền API Key thật của bạn vào đây
 # ======================================================================
-API_KEY = "cf03fc875ee64027a947ccab5ceced4b" 
+API_KEY = "ĐIỀN_API_KEY_CỦA_BẠN_VÀO_ĐÂY" 
 
 col_t, col_m, col_f = st.columns([2, 1, 1])
 with col_m: selected_ticker = st.text_input("📈 Mã Giao dịch:", value="XAU/USD")
@@ -30,7 +30,6 @@ with col_f: selected_tf = st.selectbox("⏳ Khung thời gian:", list(tf_mapping
 @st.cache_data(ttl=60)
 def load_data(ticker, tf_label, api_key):
     try:
-        # 1. NẾU LÀ XAU/USD -> DÙNG TWELVE DATA API (ĐỂ LẤY VOLUME)
         if ticker.upper() == "XAU/USD":
             if not api_key or api_key == "ĐIỀN_API_KEY_CỦA_BẠN_VÀO_ĐÂY":
                 return pd.DataFrame(), "Vui lòng điền API Key của Twelve Data vào code (dòng 21) để lấy dữ liệu XAU/USD."
@@ -40,40 +39,25 @@ def load_data(ticker, tf_label, api_key):
             response = requests.get(url).json()
             
             if "values" not in response:
-                return pd.DataFrame(), f"Lỗi API Twelve Data: {response.get('message', 'Vượt quá giới hạn gọi hoặc lỗi mạng.')}"
+                return pd.DataFrame(), f"Lỗi API Twelve Data: {response.get('message', 'Lỗi kết nối.')}"
             
-            # Xử lý dữ liệu trả về thành bảng cho các chỉ báo đọc
             df = pd.DataFrame(response['values'])
             df['datetime'] = pd.to_datetime(df['datetime'])
-            df = df.set_index('datetime')
-            df = df.sort_index(ascending=True) # Đảo ngược thứ tự thời gian cho đúng chuẩn
-            
+            df = df.set_index('datetime').sort_index(ascending=True)
             for col in ['open', 'high', 'low', 'close', 'volume']:
-                if col in df.columns:
-                    df[col] = df[col].astype(float)
-                else:
-                    df[col] = 0.0 
-            
+                df[col] = df[col].astype(float)
             df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
             return df, "OK"
-            
-        # 2. NẾU LÀ CÁC MÃ KHÁC (GC=F, VN30...) -> DÙNG YAHOO FINANCE
         else:
+            # Dành cho các mã khác như GC=F
             interval = tf_mapping[tf_label]["yf_interval"]
             period = tf_mapping[tf_label]["yf_period"]
-            tk = yf.Ticker(ticker)
-            data = tk.history(period=period, interval=interval)
-            
-            if data.empty:
-                return pd.DataFrame(), "Yahoo Finance không trả về dữ liệu."
-            if data.index.tz is not None:
-                data.index = data.index.tz_localize(None)
+            data = yf.Ticker(ticker).history(period=period, interval=interval)
+            if data.empty: return pd.DataFrame(), "Lỗi dữ liệu."
+            if data.index.tz is not None: data.index = data.index.tz_localize(None)
             return data, "OK"
-            
-    except Exception as e: 
-        return pd.DataFrame(), str(e)
+    except Exception as e: return pd.DataFrame(), str(e)
 
-# Chạy hàm tải dữ liệu
 df, error_msg = load_data(selected_ticker, selected_tf, API_KEY)
 
 if not df.empty:
@@ -84,7 +68,7 @@ if not df.empty:
         st.subheader("🛠️ Kho Chỉ Báo")
         folder = "custom_indicators"
         if not os.path.exists(folder): os.makedirs(folder)
-        files = [f for f in os.listdir(folder) if f.endswith('.py') and f != '__init__.py']
+        files = sorted([f for f in os.listdir(folder) if f.endswith('.py') and f != '__init__.py'])
         
         for f in files:
             if st.checkbox(f"Kích hoạt: {f}", value=True):
@@ -102,6 +86,8 @@ if not df.empty:
     if active_summaries:
         summary = f"📊 [BỐI CẢNH {selected_ticker} - {selected_tf}]\n" + "\n".join([f"- {s}" for s in active_summaries])
         st.info(summary)
+        # LƯU TRỮ DỮ LIỆU ĐỂ TRUYỀN SANG TRANG CHỦ
         st.session_state['tech_indicators'] = summary
+        st.session_state['current_price'] = float(df['Close'].iloc[-1])
 else:
-    st.error(f"❌ Lỗi truy xuất dữ liệu: {error_msg}")
+    st.error(f"❌ {error_msg}")
