@@ -32,7 +32,7 @@ def load_data(ticker, tf_label, api_key):
     try:
         # 1. NẾU LÀ XAU/USD -> DÙNG TWELVE DATA API (ĐỂ LẤY VOLUME)
         if ticker.upper() == "XAU/USD":
-            if not api_key or api_key == "cf03fc875ee64027a947ccab5ceced4b":
+            if not api_key or api_key == "hay dien api vao day":
                 return pd.DataFrame(), "Vui lòng điền API Key của Twelve Data vào code (dòng 21) để lấy dữ liệu XAU/USD."
                 
             td_interval = tf_mapping[tf_label]["td_interval"]
