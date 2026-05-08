@@ -7,6 +7,20 @@ import importlib.util
 from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Module Chỉ Báo", layout="wide")
+
+# ==========================================================
+# CỔNG BẢO VỆ (SECURITY GATE)
+# ==========================================================
+# Kiểm tra nếu chưa đăng nhập ở trang chủ thì chặn truy cập
+if "logged_in" not in st.session_state or not st.session_state["logged_in"]:
+    st.warning("🔒 Vui lòng quay lại trang chủ để đăng nhập trước khi sử dụng công cụ này.")
+    if st.button("Đi tới trang chủ"):
+        st.switch_page("app.py")
+    st.stop()
+
+# ==========================================================
+# PHẦN CODE CHỈ BÁO (CHỈ CHẠY KHI ĐÃ ĐĂNG NHẬP)
+# ==========================================================
 st_autorefresh(interval=60000, key="live_refresh")
 
 tf_mapping = {
@@ -18,10 +32,8 @@ tf_mapping = {
 
 st.title("⚙️ Engine Phân Tích Chỉ Báo (Bản API Chuyên Nghiệp)")
 
-# ======================================================================
-# QUAN TRỌNG: Hãy điền API Key thật của bạn vào đây
-# ======================================================================
-API_KEY = "cf03fc875ee64027a947ccab5ceced4b" 
+# Điền API Key của bạn vào đây
+API_KEY = "ĐIỀN_API_KEY_CỦA_BẠN_VÀO_ĐÂY" 
 
 col_t, col_m, col_f = st.columns([2, 1, 1])
 with col_m: selected_ticker = st.text_input("📈 Mã Giao dịch:", value="XAU/USD")
@@ -32,25 +44,22 @@ def load_data(ticker, tf_label, api_key):
     try:
         if ticker.upper() == "XAU/USD":
             if not api_key or api_key == "ĐIỀN_API_KEY_CỦA_BẠN_VÀO_ĐÂY":
-                return pd.DataFrame(), "Vui lòng điền API Key của Twelve Data vào code (dòng 21) để lấy dữ liệu XAU/USD."
+                return pd.DataFrame(), "Vui lòng điền API Key của Twelve Data."
                 
             td_interval = tf_mapping[tf_label]["td_interval"]
             url = f"https://api.twelvedata.com/time_series?symbol={ticker}&interval={td_interval}&outputsize=1000&apikey={api_key}"
             response = requests.get(url).json()
             
             if "values" not in response:
-                return pd.DataFrame(), f"Lỗi API Twelve Data: {response.get('message', 'Lỗi kết nối.')}"
+                return pd.DataFrame(), f"Lỗi API: {response.get('message', 'Lỗi kết nối.')}"
             
             df = pd.DataFrame(response['values'])
             df['datetime'] = pd.to_datetime(df['datetime'])
             df = df.set_index('datetime').sort_index(ascending=True)
             
-            # Xử lý Giá (Bắt buộc có)
             for col in ['open', 'high', 'low', 'close']:
-                if col in df.columns:
-                    df[col] = df[col].astype(float)
+                if col in df.columns: df[col] = df[col].astype(float)
             
-            # Xử lý Volume an toàn (Nếu API keo kiệt không cho thì gán bằng 0)
             if 'volume' in df.columns:
                 df['volume'] = df['volume'].astype(float)
             else:
@@ -59,7 +68,6 @@ def load_data(ticker, tf_label, api_key):
             df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
             return df, "OK"
         else:
-            # Dành cho các mã khác như GC=F
             interval = tf_mapping[tf_label]["yf_interval"]
             period = tf_mapping[tf_label]["yf_period"]
             data = yf.Ticker(ticker).history(period=period, interval=interval)
@@ -96,7 +104,6 @@ if not df.empty:
     if active_summaries:
         summary = f"📊 [BỐI CẢNH {selected_ticker} - {selected_tf}]\n" + "\n".join([f"- {s}" for s in active_summaries])
         st.info(summary)
-        # LƯU TRỮ DỮ LIỆU ĐỂ TRUYỀN SANG TRANG CHỦ
         st.session_state['tech_indicators'] = summary
         st.session_state['current_price'] = float(df['Close'].iloc[-1])
 else:
