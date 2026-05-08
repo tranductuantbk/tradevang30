@@ -44,8 +44,18 @@ def load_data(ticker, tf_label, api_key):
             df = pd.DataFrame(response['values'])
             df['datetime'] = pd.to_datetime(df['datetime'])
             df = df.set_index('datetime').sort_index(ascending=True)
-            for col in ['open', 'high', 'low', 'close', 'volume']:
-                df[col] = df[col].astype(float)
+            
+            # Xử lý Giá (Bắt buộc có)
+            for col in ['open', 'high', 'low', 'close']:
+                if col in df.columns:
+                    df[col] = df[col].astype(float)
+            
+            # Xử lý Volume an toàn (Nếu API keo kiệt không cho thì gán bằng 0)
+            if 'volume' in df.columns:
+                df['volume'] = df['volume'].astype(float)
+            else:
+                df['volume'] = 0.0
+                
             df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
             return df, "OK"
         else:
