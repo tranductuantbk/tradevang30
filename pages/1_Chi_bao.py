@@ -21,7 +21,7 @@ st.title("⚙️ Engine Phân Tích Chỉ Báo (Bản API Chuyên Nghiệp)")
 # ======================================================================
 # ĐIỀN API KEY CỦA BẠN VÀO GIỮA 2 DẤU NGOẶC KÉP Ở DÒNG DƯỚI ĐÂY
 # ======================================================================
-API_KEY = "ĐIỀN_API_KEY_CỦA_BẠN_VÀO_ĐÂY" 
+API_KEY = "cf03fc875ee64027a947ccab5ceced4b" 
 
 col_t, col_m, col_f = st.columns([2, 1, 1])
 with col_m: selected_ticker = st.text_input("📈 Mã Giao dịch:", value="XAU/USD")
