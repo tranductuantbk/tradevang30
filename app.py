@@ -5,7 +5,7 @@ st.set_page_config(layout="wide", page_title="Lá Hữu Đức Quant Hub", page_
 # ==========================================================
 # 0. BẢO MẬT
 # ==========================================================
-SECRET_PASSWORD = "admin" # Hãy đổi mật khẩu của bạn tại đây
+SECRET_PASSWORD = "tbk1102" # Hãy đổi mật khẩu của bạn tại đây
 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
