@@ -4,7 +4,7 @@ import numpy as np
 def run_indicator(df):
     """
     Đỉnh Đáy VZO [Supertrend Sync]
-    Bản dịch Python cho Quang Quant Hub (Đã tùy chỉnh tên theo yêu cầu)
+    Bản dịch Python cho Quang Quant Hub (Đã fix lỗi Index và Logic)
     """
     d = df.copy()
     
@@ -22,32 +22,27 @@ def run_indicator(df):
     # 1. BỘ LỌC XU HƯỚNG SUPERTREND (ATR=10, Factor=3.0)
     # ==========================================
     tr = np.maximum(high - low, np.maximum(abs(high - close.shift(1)), abs(low - close.shift(1))))
-    # Hàm RMA (Mặc định của TradingView cho ATR)
     atr = pd.Series(tr).ewm(alpha=1/10, adjust=False).mean()
     
     hl2 = (high + low) / 2
     basic_ub = hl2 + 3.0 * atr
     basic_lb = hl2 - 3.0 * atr
 
-    # Tính toán dải Supertrend
     final_ub = pd.Series(0.0, index=df.index)
     final_lb = pd.Series(0.0, index=df.index)
-    direction = pd.Series(1, index=df.index) # 1 = Tăng, -1 = Giảm
+    direction = pd.Series(1, index=df.index)
 
     for i in range(1, len(df)):
-        # Upper band logic
         if basic_ub.iloc[i] < final_ub.iloc[i-1] or close.iloc[i-1] > final_ub.iloc[i-1]:
             final_ub.iloc[i] = basic_ub.iloc[i]
         else:
             final_ub.iloc[i] = final_ub.iloc[i-1]
             
-        # Lower band logic
         if basic_lb.iloc[i] > final_lb.iloc[i-1] or close.iloc[i-1] < final_lb.iloc[i-1]:
             final_lb.iloc[i] = basic_lb.iloc[i]
         else:
             final_lb.iloc[i] = final_lb.iloc[i-1]
             
-        # Direction flip
         if direction.iloc[i-1] == 1 and close.iloc[i] < final_lb.iloc[i]:
             direction.iloc[i] = -1
         elif direction.iloc[i-1] == -1 and close.iloc[i] > final_ub.iloc[i]:
@@ -56,14 +51,16 @@ def run_indicator(df):
             direction.iloc[i] = direction.iloc[i-1]
 
     # ==========================================
-    # 2. CHỈ BÁO DÒNG TIỀN (VZO)
+    # 2. CHỈ BÁO DÒNG TIỀN (VZO) - [ĐÃ FIX LỖI INDEX]
     # ==========================================
     vol_dir = np.where(close > close.shift(1), volume, -volume)
-    vzo_vol = pd.Series(vol_dir).ewm(span=14, adjust=False).mean()
+    
+    # Ép index của df vào ngay lập tức để không bị lỗi NaN khi chia
+    vzo_vol = pd.Series(vol_dir, index=df.index).ewm(span=14, adjust=False).mean()
     tot_vol = volume.ewm(span=14, adjust=False).mean()
     
     raw_vzo = np.where(tot_vol != 0, 100 * vzo_vol / tot_vol, 0)
-    vzo = pd.Series(raw_vzo).ewm(span=4, adjust=False).mean()
+    vzo = pd.Series(raw_vzo, index=df.index).ewm(span=4, adjust=False).mean()
 
     # ==========================================
     # 3. THUẬT TOÁN ĐỈNH ĐÁY VÀ KIỆT SỨC CHỐNG SPAM
@@ -75,8 +72,8 @@ def run_indicator(df):
     ready_sell = False
     action_signal = "Đang rình mồi. Dòng tiền VZO nằm trong biên độ an toàn."
 
-    # Lặp qua các nến gần đây để tái tạo bộ nhớ trạng thái "Lên Nòng" (Arming)
-    for i in range(1, len(df)):
+    # [ĐÃ FIX LOGIC i-2] - Vòng lặp bắt đầu từ 2 thay vì 1
+    for i in range(2, len(df)):
         macro = direction.iloc[i]
         macro_prev = direction.iloc[i-1]
         v_curr = vzo.iloc[i]
@@ -95,7 +92,7 @@ def run_indicator(df):
             hook_up = (v_curr > v_prev) and (v_prev <= v_prev2)
             price_ok = (close.iloc[i] >= open_p.iloc[i]) or (close.iloc[i] > low.iloc[i] + (high.iloc[i]-low.iloc[i])*0.3)
             if hook_up and price_ok:
-                ready_buy = False # Khóa chốt
+                ready_buy = False 
                 if i >= len(df) - 3:
                     action_signal = "🟢 KIỆT SỨC BÁN (MUA): Phe Gấu hết lực, Supertrend Tăng bảo kê. Bóp cò LONG!"
 
@@ -108,7 +105,7 @@ def run_indicator(df):
             hook_dn = (v_curr < v_prev) and (v_prev >= v_prev2)
             price_ok = (close.iloc[i] <= open_p.iloc[i]) or (close.iloc[i] < high.iloc[i] - (high.iloc[i]-low.iloc[i])*0.3)
             if hook_dn and price_ok:
-                ready_sell = False # Khóa chốt
+                ready_sell = False 
                 if i >= len(df) - 3:
                     action_signal = "🔴 KIỆT SỨC MUA (BÁN): Phe Bò kiệt sức, Supertrend Giảm bảo kê. Bóp cò SHORT!"
 
@@ -118,7 +115,6 @@ def run_indicator(df):
     curr_vzo = float(vzo.iloc[-1])
     curr_trend = "TĂNG" if direction.iloc[-1] == 1 else "GIẢM"
     
-    # Phân loại Vùng VZO
     zone = "Vùng Đi Ngang (Chop Zone)"
     if curr_vzo >= 60: zone = "Quá Mua Cực Đại (Rủi ro Đảo chiều Bán)"
     elif curr_vzo >= 40: zone = "Quá Mua"
