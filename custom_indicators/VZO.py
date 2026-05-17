@@ -3,8 +3,7 @@ import numpy as np
 
 def run_indicator(df):
     """
-    Đỉnh Đáy VZO [Supertrend Sync]
-    Bản dịch Python cho Quang Quant Hub (Đã fix lỗi Index và Logic)
+    Đỉnh Đáy VZO [Supertrend Sync] - Bản nâng cấp xuất dữ liệu đồ thị
     """
     d = df.copy()
     
@@ -51,11 +50,9 @@ def run_indicator(df):
             direction.iloc[i] = direction.iloc[i-1]
 
     # ==========================================
-    # 2. CHỈ BÁO DÒNG TIỀN (VZO) - [ĐÃ FIX LỖI INDEX]
+    # 2. CHỈ BÁO DÒNG TIỀN (VZO)
     # ==========================================
     vol_dir = np.where(close > close.shift(1), volume, -volume)
-    
-    # Ép index của df vào ngay lập tức để không bị lỗi NaN khi chia
     vzo_vol = pd.Series(vol_dir, index=df.index).ewm(span=14, adjust=False).mean()
     tot_vol = volume.ewm(span=14, adjust=False).mean()
     
@@ -66,13 +63,16 @@ def run_indicator(df):
     # 3. THUẬT TOÁN ĐỈNH ĐÁY VÀ KIỆT SỨC CHỐNG SPAM
     # ==========================================
     if len(df) < 50 or pd.isna(vzo.iloc[-1]):
-        return "Chỉ báo Đỉnh Đáy VZO: Đang nạp dữ liệu Volume."
+        # Định dạng trả về đồng bộ (Text, Dict rỗng) khi chưa đủ data
+        return "Chỉ báo Đỉnh Đáy VZO: Đang nạp dữ liệu Volume.", {}
 
-    ready_buy = False
-    ready_sell = False
+    ready_buy, ready_sell = False, False
     action_signal = "Đang rình mồi. Dòng tiền VZO nằm trong biên độ an toàn."
+    
+    # Tạo các mảng lưu tín hiệu để vẽ lên chart (MUA=1, BÁN=-1)
+    buy_signals = pd.Series(np.nan, index=df.index)
+    sell_signals = pd.Series(np.nan, index=df.index)
 
-    # [ĐÃ FIX LOGIC i-2] - Vòng lặp bắt đầu từ 2 thay vì 1
     for i in range(2, len(df)):
         macro = direction.iloc[i]
         macro_prev = direction.iloc[i-1]
@@ -83,7 +83,7 @@ def run_indicator(df):
         if macro != macro_prev:
             ready_buy, ready_sell = False, False
 
-        # --- LOGIC KIỆT SỨC BÁN (TÌM ĐIỂM MUA) ---
+        # --- LOGIC KIỆT SỨC BÁN (MUA) ---
         cross_dn_limit = (v_prev >= 15) and (v_curr < 15)
         if macro == 1 and (cross_dn_limit or (macro != macro_prev and v_curr <= 15)):
             ready_buy = True
@@ -93,10 +93,11 @@ def run_indicator(df):
             price_ok = (close.iloc[i] >= open_p.iloc[i]) or (close.iloc[i] > low.iloc[i] + (high.iloc[i]-low.iloc[i])*0.3)
             if hook_up and price_ok:
                 ready_buy = False 
+                buy_signals.iloc[i] = v_curr # Lưu vị trí điểm VZO để vẽ chấm tròn
                 if i >= len(df) - 3:
                     action_signal = "🟢 KIỆT SỨC BÁN (MUA): Phe Gấu hết lực, Supertrend Tăng bảo kê. Bóp cò LONG!"
 
-        # --- LOGIC KIỆT SỨC MUA (TÌM ĐIỂM BÁN) ---
+        # --- LOGIC KIỆT SỨC MUA (BÁN) ---
         cross_up_limit = (v_prev <= -15) and (v_curr > -15)
         if macro == -1 and (cross_up_limit or (macro != macro_prev and v_curr >= -15)):
             ready_sell = True
@@ -106,6 +107,7 @@ def run_indicator(df):
             price_ok = (close.iloc[i] <= open_p.iloc[i]) or (close.iloc[i] < high.iloc[i] - (high.iloc[i]-low.iloc[i])*0.3)
             if hook_dn and price_ok:
                 ready_sell = False 
+                sell_signals.iloc[i] = v_curr # Lưu vị trí điểm VZO để vẽ chấm tròn
                 if i >= len(df) - 3:
                     action_signal = "🔴 KIỆT SỨC MUA (BÁN): Phe Bò kiệt sức, Supertrend Giảm bảo kê. Bóp cò SHORT!"
 
@@ -128,4 +130,12 @@ def run_indicator(df):
         f"  + Cảnh báo Hành động: {action_signal}"
     )
 
-    return text_for_ai
+    # Đóng gói toàn bộ các đường vẽ và mảng tín hiệu vào một Dictionary
+    plot_data = {
+        "vzo": vzo,
+        "supertrend_direction": direction,
+        "buy_signals": buy_signals,
+        "sell_signals": sell_signals
+    }
+
+    return text_for_ai, plot_data
