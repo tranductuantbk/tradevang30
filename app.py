@@ -8,8 +8,8 @@ st.set_page_config(layout="wide", page_title="Quang Quant Hub", page_icon="⚡")
 # ==========================================================
 SECRET_PASSWORD = "tbk1102"
 
-# 🔴 QUAN TRỌNG: Lấy API Key miễn phí tại https://aistudio.google.com/ và dán vào đây
-GEMINI_API_KEY = "AIzaSyAq9jRLwgdLgMoF8M1_h2Q0It5RHyceg7w" 
+# 🔴 QUAN TRỌNG: Lắp API Key của bạn vào giữa 2 dấu ngoặc kép ở dưới
+GEMINI_API_KEY = "ĐIỀN_API_KEY_GEMINI_CỦA_BẠN_VÀO_ĐÂY" 
 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -27,10 +27,10 @@ if not st.session_state["logged_in"]:
                 st.error("Mật khẩu sai!")
     st.stop()
 
-# Cấu hình AI
+# Cấu hình AI (ĐÃ FIX LỖI 404 - Dùng bản Pro ổn định nhất)
 if GEMINI_API_KEY != "ĐIỀN_API_KEY_GEMINI_CỦA_BẠN_VÀO_ĐÂY":
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-pro-latest')
+    model = genai.GenerativeModel('gemini-1.5-pro')
 else:
     model = None
 
@@ -41,7 +41,7 @@ st.sidebar.title("📡 System Status")
 indicator_data = st.session_state.get('tech_indicators', "⚠️ Chưa có dữ liệu Kỹ thuật. Vui lòng mở trang '1_Chi_bao'.")
 live_price = st.session_state.get('current_price', 0.0)
 
-# Mock data cho Tin tức FED (Tương lai sẽ viết code tự động cào tin thật)
+# Dữ liệu chờ cho module cào tin tức tự động (Sẽ phát triển sau)
 fed_news_data = st.session_state.get('fed_news', "Chưa có dữ liệu tin tức FED. (Module đang được xây dựng)")
 
 if "⚠️" in indicator_data:
@@ -66,7 +66,7 @@ c1, c2 = st.columns([1, 1])
 with c1:
     st.subheader("⚙️ Chọn Module Phân Tích")
     
-    # Xổ ra các tuỳ chọn Module
+    # Xổ ra các tuỳ chọn Module cho AI
     analysis_mode = st.selectbox(
         "🧠 Bạn muốn AI tập trung vào nguồn dữ liệu nào?",
         [
@@ -92,9 +92,7 @@ with c2:
             st.warning("⚠️ Chưa có dữ liệu Kỹ thuật để phân tích. Hãy qua trang Chỉ báo mở lên trước.")
         else:
             with st.spinner("AI đang xử lý dữ liệu và lập kế hoạch..."):
-                # ========================================
-                # LẬP TRÌNH PROMPT CHO AI
-                # ========================================
+                # Gom dữ liệu để nhét vào não AI
                 data_to_analyze = ""
                 if "1" in analysis_mode:
                     data_to_analyze += f"\n--- DỮ LIỆU KỸ THUẬT ---\n{indicator_data}\n"
@@ -103,6 +101,7 @@ with c2:
                 else:
                     data_to_analyze += f"\n--- DỮ LIỆU KỸ THUẬT ---\n{indicator_data}\n--- DỮ LIỆU VĨ MÔ (FED) ---\n{fed_news_data}\n"
 
+                # Lệnh System Prompt ép AI đóng vai Giám đốc Quỹ
                 system_prompt = f"""
                 Bạn là một Giám đốc Đầu tư (Quant Strategist) tại một quỹ Hedge Fund chuyên giao dịch XAU/USD.
                 Giá hiện tại là: {live_price}.
@@ -130,7 +129,7 @@ with c2:
 st.markdown("---")
 
 # ==========================================================
-# 3. CÀI ĐẶT LỆNH
+# 3. MÁY TÍNH VÀO LỆNH
 # ==========================================================
 st.subheader("⚡ Máy Tính Vào Lệnh")
 entry_col, sl_col, tp_col = st.columns(3)
