@@ -1,11 +1,15 @@
 import streamlit as st
+import google.generativeai as genai
 
 st.set_page_config(layout="wide", page_title="Quang Quant Hub", page_icon="⚡")
 
 # ==========================================================
-# 0. BẢO MẬT
+# 0. BẢO MẬT & KẾT NỐI API AI (GEMINI)
 # ==========================================================
-SECRET_PASSWORD = "tbk1102" # Hãy đổi mật khẩu của bạn tại đây
+SECRET_PASSWORD = "tbk1102"
+
+# 🔴 QUAN TRỌNG: Lấy API Key miễn phí tại https://aistudio.google.com/ và dán vào đây
+GEMINI_API_KEY = "ĐIỀN_API_KEY_GEMINI_CỦA_BẠN_VÀO_ĐÂY" 
 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -23,49 +27,114 @@ if not st.session_state["logged_in"]:
                 st.error("Mật khẩu sai!")
     st.stop()
 
+# Cấu hình AI
+if GEMINI_API_KEY != "ĐIỀN_API_KEY_GEMINI_CỦA_BẠN_VÀO_ĐÂY":
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-pro-latest')
+else:
+    model = None
+
 # ==========================================================
 # 1. SIDEBAR TRẠNG THÁI
 # ==========================================================
 st.sidebar.title("📡 System Status")
-indicator_data = st.session_state.get('tech_indicators', "⚠️ Chưa có dữ liệu. Vui lòng mở trang '1_Chi_bao'.")
+indicator_data = st.session_state.get('tech_indicators', "⚠️ Chưa có dữ liệu Kỹ thuật. Vui lòng mở trang '1_Chi_bao'.")
 live_price = st.session_state.get('current_price', 0.0)
+
+# Mock data cho Tin tức FED (Tương lai sẽ viết code tự động cào tin thật)
+fed_news_data = st.session_state.get('fed_news', "Chưa có dữ liệu tin tức FED. (Module đang được xây dựng)")
 
 if "⚠️" in indicator_data:
     st.sidebar.warning(indicator_data)
 else:
     st.sidebar.success(f"✅ Dữ liệu Giá: {live_price:,.2f}")
     st.sidebar.success("✅ Module Kỹ thuật: ONLINE")
-
+    
 if st.sidebar.button("🚪 Đăng xuất"):
     st.session_state["logged_in"] = False
     st.rerun()
 
 # ==========================================================
-# 2. BẢNG ĐIỀU KHIỂN CHÍNH
+# 2. BẢNG ĐIỀU KHIỂN CHÍNH & AI STRATEGIST
 # ==========================================================
 st.title("⚡ Quant Trading Hub - AI Strategist")
 st.markdown(f"**Mã theo dõi:** XAU/USD | **Giá hiện tại:** `{live_price:,.2f}`")
 st.markdown("---")
 
-c1, c2 = st.columns([2, 1])
+c1, c2 = st.columns([1, 1])
+
 with c1:
-    st.subheader("📊 Tổng hợp Chỉ báo")
-    st.info(indicator_data)
+    st.subheader("⚙️ Chọn Module Phân Tích")
+    
+    # Xổ ra các tuỳ chọn Module
+    analysis_mode = st.selectbox(
+        "🧠 Bạn muốn AI tập trung vào nguồn dữ liệu nào?",
+        [
+            "1. Phân tích Kỹ thuật (Chỉ báo VZO, CMF, MACD...)",
+            "2. Phân tích Vĩ mô (Đọc tin FED, Lãi suất)",
+            "3. Tổng hợp Toàn diện (Kỹ thuật + Vĩ mô)"
+        ]
+    )
+    
+    st.markdown("**Dữ liệu thô đang có:**")
+    with st.expander("Hiển thị dữ liệu Kỹ Thuật"):
+        st.code(indicator_data, language="text")
+    with st.expander("Hiển thị dữ liệu Vĩ Mô (FED)"):
+        st.code(fed_news_data, language="text")
+
 with c2:
-    st.subheader("🤖 AI Hành động")
-    if st.button("🚀 PHÂN TÍCH & ĐỀ XUẤT", use_container_width=True, type="primary"):
-        with st.spinner("Đang tính toán bối cảnh..."):
-            st.success("Hệ thống đã sẵn sàng. AI đang chờ lệnh từ bạn.")
+    st.subheader("🤖 Phân Tích & Kế Hoạch Giao Dịch")
+    
+    if st.button("🚀 KÍCH HOẠT AI PHÂN TÍCH", use_container_width=True, type="primary"):
+        if model is None:
+            st.error("❌ Bạn chưa điền GEMINI_API_KEY vào code (Dòng 11). Hãy lấy API Key để AI hoạt động.")
+        elif "⚠️" in indicator_data and "1" in analysis_mode:
+            st.warning("⚠️ Chưa có dữ liệu Kỹ thuật để phân tích. Hãy qua trang Chỉ báo mở lên trước.")
+        else:
+            with st.spinner("AI đang xử lý dữ liệu và lập kế hoạch..."):
+                # ========================================
+                # LẬP TRÌNH PROMPT CHO AI
+                # ========================================
+                data_to_analyze = ""
+                if "1" in analysis_mode:
+                    data_to_analyze += f"\n--- DỮ LIỆU KỸ THUẬT ---\n{indicator_data}\n"
+                elif "2" in analysis_mode:
+                    data_to_analyze += f"\n--- DỮ LIỆU VĨ MÔ (FED) ---\n{fed_news_data}\n"
+                else:
+                    data_to_analyze += f"\n--- DỮ LIỆU KỸ THUẬT ---\n{indicator_data}\n--- DỮ LIỆU VĨ MÔ (FED) ---\n{fed_news_data}\n"
+
+                system_prompt = f"""
+                Bạn là một Giám đốc Đầu tư (Quant Strategist) tại một quỹ Hedge Fund chuyên giao dịch XAU/USD.
+                Giá hiện tại là: {live_price}.
+                
+                Dưới đây là các dữ liệu hệ thống báo về:
+                {data_to_analyze}
+                
+                Nhiệm vụ của bạn:
+                1. Tóm tắt tình hình thị trường (Dòng tiền đang vào hay ra? Lực Mua/Bán phe nào áp đảo?).
+                2. Nếu có dữ liệu FED, đánh giá tác động của nó đến Vàng (Hawkish/Dovish).
+                3. Đưa ra DỰ BÁO XU HƯỚNG SẮP TỚI.
+                4. Đưa ra KẾ HOẠCH GIAO DỊCH RÕ RÀNG (Ưu tiên BUY, SELL hay Đứng ngoài? Đợi tín hiệu gì tiếp theo?).
+                
+                Hãy trả lời súc tích, chuyên nghiệp, format rõ ràng bằng Markdown, không dùng từ ngữ chung chung.
+                """
+                
+                try:
+                    response = model.generate_content(system_prompt)
+                    st.success("✅ Phân tích hoàn tất!")
+                    st.markdown("### 📋 BÁO CÁO TỪ AI STRATEGIST")
+                    st.info(response.text)
+                except Exception as e:
+                    st.error(f"❌ Lỗi kết nối AI: {e}")
 
 st.markdown("---")
 
 # ==========================================================
-# 3. CÀI ĐẶT LỆNH (TỰ ĐỘNG CẬP NHẬT GIÁ)
+# 3. CÀI ĐẶT LỆNH
 # ==========================================================
-st.subheader("⚡ Cài đặt Lệnh Giao dịch")
+st.subheader("⚡ Máy Tính Vào Lệnh")
 entry_col, sl_col, tp_col = st.columns(3)
 
-# Tự động tính toán SL/TP dựa trên giá thực tế
 with entry_col: 
     entry_price = st.number_input("Giá Entry", value=float(live_price), step=0.1, format="%.2f")
 with sl_col: 
@@ -73,4 +142,4 @@ with sl_col:
 with tp_col: 
     st.number_input("Giá Take Profit (Dự kiến +15 giá)", value=float(live_price + 15), step=0.1, format="%.2f")
 
-st.caption("Lưu ý: Giá SL/TP được gợi ý dựa trên biến động ATR trung bình của hệ thống.")
+st.caption("Cài đặt giá SL/TP dựa trên kế hoạch giao dịch AI vừa đề xuất ở trên.")
