@@ -34,7 +34,7 @@ user_api_key = st.sidebar.text_input("Nhập Gemini API Key của bạn:", type=
 if user_api_key:
     try:
         genai.configure(api_key=user_api_key)
-        model = genai.GenerativeModel('gemini-pro') # Dùng bản gemini-pro siêu ổn định
+        model = genai.GenerativeModel('gemini-1.5-flash') # Chuyển sang bản Flash mới nhất
         st.sidebar.success("✅ Đã kết nối não AI!")
     except Exception as e:
         model = None
