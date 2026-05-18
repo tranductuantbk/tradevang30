@@ -48,7 +48,14 @@ def load_data(ticker, tf_label, api_key):
             df = df.set_index('datetime').sort_index(ascending=True)
             for col in ['open', 'high', 'low', 'close']:
                 if col in df.columns: df[col] = df[col].astype(float)
+            
+            # --- XỬ LÝ KHỐI LƯỢNG ẢO CHO FOREX ---
             df['volume'] = df['volume'].astype(float) if 'volume' in df.columns else 0.0
+            if df['volume'].sum() == 0:
+                # Giả lập Tick Volume bằng biên độ nến
+                df['volume'] = (df['high'] - df['low']) * 100000
+            # ---------------------------------------
+                
             df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
             return df, "OK"
         else:
@@ -57,6 +64,11 @@ def load_data(ticker, tf_label, api_key):
             data = yf.Ticker(ticker).history(period=period, interval=interval)
             if data.empty: return pd.DataFrame(), "Lỗi dữ liệu."
             if data.index.tz is not None: data.index = data.index.tz_localize(None)
+            
+            # --- XỬ LÝ KHỐI LƯỢNG ẢO CHO YAHOO FINANCE ---
+            if 'Volume' in data.columns and data['Volume'].sum() == 0:
+                data['Volume'] = (data['High'] - data['Low']) * 100000
+                
             return data, "OK"
     except Exception as e: return pd.DataFrame(), str(e)
 
@@ -68,7 +80,6 @@ def get_key(plot_dict, substring):
     return None
 
 if not df.empty:
-    # Tuyệt chiêu xóa khoảng trống cuối tuần giống TradingView (Chuyển thời gian thành chữ)
     df['time_str'] = df.index.strftime('%Y-%m-%d %H:%M')
     
     col_left, col_right = st.columns([1, 3])
@@ -97,7 +108,6 @@ if not df.empty:
                     active_summaries.append(res)
                 except Exception as e: st.error(f"❌ Lỗi {f}: {e}")
 
-    # Nhận diện File
     om_key = get_key(all_plots, "obv")
     cmf_key = get_key(all_plots, "cmf")
     vzo_key = get_key(all_plots, "vzo")
@@ -108,25 +118,23 @@ if not df.empty:
     row_heights = [5, 1] + [2] * extra_rows
     fig = make_subplots(rows=total_rows, cols=1, shared_xaxes=True, vertical_spacing=0.015, row_heights=row_heights)
     
-    # MÃ MÀU CHUẨN TRADINGVIEW
     TV_BG = '#131722'
     TV_GRID = '#2a2e39'
     TV_GREEN = '#26a69a'
     TV_RED = '#ef5350'
     TV_TEXT = '#d1d4dc'
     
-    # 1. BIỂU ĐỒ GIÁ NẾN NHẬT
+    # 1. BIỂU ĐỒ GIÁ
     fig.add_trace(go.Candlestick(x=df['time_str'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
                     name='Giá', increasing_line_color=TV_GREEN, decreasing_line_color=TV_RED,
                     increasing_fillcolor=TV_GREEN, decreasing_fillcolor=TV_RED), row=1, col=1)
     
-    # 2. KHỐI LƯỢNG (VOLUME)
+    # 2. KHỐI LƯỢNG
     v_colors = [f'rgba(38,166,154,0.4)' if r['Close'] >= r['Open'] else f'rgba(239,83,80,0.4)' for i, r in df.iterrows()]
     fig.add_trace(go.Bar(x=df['time_str'], y=df['Volume'], marker_color=v_colors, name='Volume'), row=2, col=1)
     
     current_row = 3
     
-    # HÀM LỌC RÁC: Chỉ in nhãn khi có dữ liệu thật (Lọc bỏ NaN)
     def plot_markers(fig, y_series, name, text, color, symbol, position, row):
         valid = y_series.dropna()
         if not valid.empty:
@@ -176,14 +184,12 @@ if not df.empty:
         fig.add_trace(go.Scatter(x=df['time_str'], y=[0]*len(df), mode='markers', marker=dict(color=dot_colors, size=4)), row=current_row, col=1)
         current_row += 1
 
-    # CẤU HÌNH GIAO DIỆN TRADINGVIEW DARK MODE (Đã sửa lỗi ValueError)
     fig.update_layout(
         plot_bgcolor=TV_BG, paper_bgcolor=TV_BG, font=dict(color=TV_TEXT, size=11),
         xaxis_rangeslider_visible=False, height=500 + 180 * extra_rows,
         margin=dict(l=10, r=40, t=30, b=10), showlegend=False, dragmode='pan', hovermode='x unified'
     )
     
-    # Cấu hình lưới an toàn cho TẤT CẢ các trục
     fig.update_xaxes(showgrid=True, gridcolor=TV_GRID)
     fig.update_yaxes(showgrid=True, gridcolor=TV_GRID, side='right')
     
