@@ -28,7 +28,7 @@ if not st.session_state["logged_in"]:
     st.stop()
 
 # Cấu hình AI (Đã chuyển sang bản gemini-pro ổn định nhất cho mọi tài khoản)
-if GEMINI_API_KEY != "ĐIỀN_API_KEY_GEMINI_CỦA_BẠN_VÀO_ĐÂY":
+if GEMINI_API_KEY != "AIzaSyAq9jRLwgdLgMoF8M1_h2Q0It5RHyceg7w":
     genai.configure(api_key=GEMINI_API_KEY)
     
     # Đổi tên model thành 'gemini-pro'
