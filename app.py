@@ -4,12 +4,9 @@ import google.generativeai as genai
 st.set_page_config(layout="wide", page_title="Quang Quant Hub", page_icon="⚡")
 
 # ==========================================================
-# 0. BẢO MẬT & KẾT NỐI API AI (GEMINI)
+# 0. BẢO MẬT HỆ THỐNG
 # ==========================================================
 SECRET_PASSWORD = "tbk1102"
-
-# 🔴 QUAN TRỌNG: Lắp API Key của bạn vào giữa 2 dấu ngoặc kép ở dưới
-GEMINI_API_KEY = "AIzaSyAq9jRLwgdLgMoF8M1_h2Q0It5RHyceg7w" 
 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -27,23 +24,30 @@ if not st.session_state["logged_in"]:
                 st.error("Mật khẩu sai!")
     st.stop()
 
-# Cấu hình AI (Đã chuyển sang bản gemini-pro ổn định nhất cho mọi tài khoản)
-if GEMINI_API_KEY != "AIzaSyAq9jRLwgdLgMoF8M1_h2Q0It5RHyceg7w":
-    genai.configure(api_key=GEMINI_API_KEY)
-    
-    # Đổi tên model thành 'gemini-pro'
-    model = genai.GenerativeModel('gemini-pro')
+# ==========================================================
+# 1. SIDEBAR TRẠNG THÁI & CẤU HÌNH API KEY (MỚI)
+# ==========================================================
+st.sidebar.title("🔑 Cấu hình AI (Gemini)")
+# Ô nhập API Key ngay trên giao diện web (an toàn tuyệt đối)
+user_api_key = st.sidebar.text_input("Nhập Gemini API Key của bạn:", type="password", help="Dán API Key lấy từ Google AI Studio vào đây")
+
+if user_api_key:
+    try:
+        genai.configure(api_key=user_api_key)
+        model = genai.GenerativeModel('gemini-pro') # Dùng bản gemini-pro siêu ổn định
+        st.sidebar.success("✅ Đã kết nối não AI!")
+    except Exception as e:
+        model = None
+        st.sidebar.error("❌ Lỗi cấu hình AI")
 else:
     model = None
+    st.sidebar.warning("⚠️ Vui lòng nhập API Key để AI hoạt động.")
 
-# ==========================================================
-# 1. SIDEBAR TRẠNG THÁI
-# ==========================================================
+st.sidebar.markdown("---")
 st.sidebar.title("📡 System Status")
+
 indicator_data = st.session_state.get('tech_indicators', "⚠️ Chưa có dữ liệu Kỹ thuật. Vui lòng mở trang '1_Chi_bao'.")
 live_price = st.session_state.get('current_price', 0.0)
-
-# Dữ liệu chờ cho module cào tin tức tự động (Sẽ phát triển sau)
 fed_news_data = st.session_state.get('fed_news', "Chưa có dữ liệu tin tức FED. (Module đang được xây dựng)")
 
 if "⚠️" in indicator_data:
@@ -68,7 +72,6 @@ c1, c2 = st.columns([1, 1])
 with c1:
     st.subheader("⚙️ Chọn Module Phân Tích")
     
-    # Xổ ra các tuỳ chọn Module cho AI
     analysis_mode = st.selectbox(
         "🧠 Bạn muốn AI tập trung vào nguồn dữ liệu nào?",
         [
@@ -89,12 +92,11 @@ with c2:
     
     if st.button("🚀 KÍCH HOẠT AI PHÂN TÍCH", use_container_width=True, type="primary"):
         if model is None:
-            st.error("❌ Bạn chưa điền GEMINI_API_KEY vào code (Dòng 11). Hãy lấy API Key để AI hoạt động.")
+            st.error("❌ BẠN CHƯA NHẬP API KEY! Hãy nhìn sang thanh menu bên trái, dán Gemini API Key vào ô trống để khởi động AI.")
         elif "⚠️" in indicator_data and "1" in analysis_mode:
-            st.warning("⚠️ Chưa có dữ liệu Kỹ thuật để phân tích. Hãy qua trang Chỉ báo mở lên trước.")
+            st.warning("⚠️ Chưa có dữ liệu Kỹ thuật để phân tích. Hãy qua trang 'Chỉ báo' mở lên trước.")
         else:
             with st.spinner("AI đang xử lý dữ liệu và lập kế hoạch..."):
-                # Gom dữ liệu để nhét vào não AI
                 data_to_analyze = ""
                 if "1" in analysis_mode:
                     data_to_analyze += f"\n--- DỮ LIỆU KỸ THUẬT ---\n{indicator_data}\n"
@@ -103,7 +105,6 @@ with c2:
                 else:
                     data_to_analyze += f"\n--- DỮ LIỆU KỸ THUẬT ---\n{indicator_data}\n--- DỮ LIỆU VĨ MÔ (FED) ---\n{fed_news_data}\n"
 
-                # Lệnh System Prompt ép AI đóng vai Giám đốc Quỹ
                 system_prompt = f"""
                 Bạn là một Giám đốc Đầu tư (Quant Strategist) tại một quỹ Hedge Fund chuyên giao dịch XAU/USD.
                 Giá hiện tại là: {live_price}.
@@ -126,7 +127,7 @@ with c2:
                     st.markdown("### 📋 BÁO CÁO TỪ AI STRATEGIST")
                     st.info(response.text)
                 except Exception as e:
-                    st.error(f"❌ Lỗi kết nối AI: {e}")
+                    st.error(f"❌ Có lỗi trong quá trình AI phân tích. Vui lòng thử lại. Chi tiết lỗi: {e}")
 
 st.markdown("---")
 
