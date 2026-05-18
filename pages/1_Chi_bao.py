@@ -7,6 +7,7 @@ import importlib.util
 from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import numpy as np
 
 st.set_page_config(page_title="Module Chỉ Báo", layout="wide")
 
@@ -61,6 +62,11 @@ def load_data(ticker, tf_label, api_key):
 
 df, error_msg = load_data(selected_ticker, selected_tf, API_KEY)
 
+def get_key(plot_dict, substring):
+    for k in plot_dict.keys():
+        if substring in k.lower(): return k
+    return None
+
 if not df.empty:
     col_left, col_right = st.columns([1, 3])
     active_summaries = []
@@ -84,81 +90,74 @@ if not df.empty:
                         if plot_data: all_plots[f] = plot_data
                     else:
                         res = out
-                    st.success(f"📊 {f}")
+                    st.success(f"✅ {f} đang chạy")
                     active_summaries.append(res)
                 except Exception as e: st.error(f"❌ Lỗi {f}: {e}")
 
-    # ==========================================================
-    # PHÂN TÍCH LAYOUT TẦNG ĐỒ THỊ ĐỘNG
-    # ==========================================================
-    show_obv_macd = any("obv_macd" in k for k in all_plots.keys())
-    show_cmf = any("cmf" in k for k in all_plots.keys())
-    show_vzo = any("vzo" in k for k in all_plots.keys())
+    # Nhận diện File Không phân biệt hoa/thường
+    om_key = get_key(all_plots, "obv")
+    cmf_key = get_key(all_plots, "cmf")
+    vzo_key = get_key(all_plots, "vzo")
+    sqz_key = get_key(all_plots, "sqz")
     
-    extra_rows = int(show_obv_macd) + int(show_cmf) + int(show_vzo)
+    extra_rows = bool(om_key) + bool(cmf_key) + bool(vzo_key) + bool(sqz_key)
     total_rows = 2 + extra_rows
     
-    row_heights = [0.5] + [0.15] + [0.15] * extra_rows
+    # Chia tỷ lệ: Nến (4 phần), Volume (1 phần), Các chỉ báo phụ (mỗi cái 2 phần)
+    row_heights = [4, 1] + [2] * extra_rows
     fig = make_subplots(rows=total_rows, cols=1, shared_xaxes=True, vertical_spacing=0.02, row_heights=row_heights)
     
-    # TẦNG 1: BIỂU ĐỒ GIÁ CHUẨN TRADINGVIEW
+    # 1. BIỂU ĐỒ GIÁ
     fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
-                    name='Price', increasing_line_color='#00E676', decreasing_line_color='#FF1744',
-                    increasing_fillcolor='#00E676', decreasing_fillcolor='#FF1744'), row=1, col=1)
+                    name='Giá', increasing_line_color='#00E676', decreasing_line_color='#FF1744'), row=1, col=1)
     
-    # TẦNG 2: KHỐI LƯỢNG VOLUME MỜ
-    v_colors = ['rgba(0,230,118,0.3)' if r['Close'] >= r['Open'] else 'rgba(255,23,68,0.3)' for i, r in df.iterrows()]
+    # 2. VOLUME
+    v_colors = ['rgba(0,230,118,0.4)' if r['Close'] >= r['Open'] else 'rgba(255,23,68,0.4)' for i, r in df.iterrows()]
     fig.add_trace(go.Bar(x=df.index, y=df['Volume'], marker_color=v_colors, name='Volume'), row=2, col=1)
     
     current_row = 3
     
-    # TẦNG 3: OBV MACD SNIPER (NẾU ĐƯỢC BẬT)
-    if show_obv_macd:
-        om_key = [k for k in all_plots.keys() if "obv_macd" in k][0]
+    # 3. OBV MACD SNIPER
+    if om_key:
         om_data = all_plots[om_key]
         sig = om_data["signal_val"]
-        
-        # Đường xu hướng chính
-        l_colors = ['#00E676' if v > 0 else '#FF1744' for v in sig]
         fig.add_trace(go.Scatter(x=df.index, y=sig, mode='lines', line=dict(width=2, color='#00FF00'), name='OBV-MACD'), row=current_row, col=1)
         fig.add_hline(y=0, line_dash="dash", line_color="rgba(255,255,255,0.2)", row=current_row, col=1)
-        
-        # Nhãn CẠN MUA / CẠN BÁN bám đỉnh đáy
-        fig.add_trace(go.Scatter(x=df.index, y=om_data["buy_labels"], mode='markers+text', text="CẠN MUA",
-                                 textposition="bottom center", marker=dict(color='#00C853', size=8, symbol='triangle-up'), name='Cạn Mua'), row=current_row, col=1)
-        fig.add_trace(go.Scatter(x=df.index, y=om_data["sell_labels"], mode='markers+text', text="CẠN BÁN",
-                                 textposition="top center", marker=dict(color='#D50000', size=8, symbol='triangle-down'), name='Cạn Bán'), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=om_data["buy_labels"], mode='markers+text', text="CẠN MUA", textposition="bottom center", marker=dict(color='#00C853', size=8, symbol='triangle-up')), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=om_data["sell_labels"], mode='markers+text', text="CẠN BÁN", textposition="top center", marker=dict(color='#D50000', size=8, symbol='triangle-down')), row=current_row, col=1)
         current_row += 1
 
-    # TẦNG 4: CMF PRO (NẾU ĐƯỢC BẬT)
-    if show_cmf:
-        cmf_key = [k for k in all_plots.keys() if "cmf" in k][0]
+    # 4. CMF PRO
+    if cmf_key:
         c_data = all_plots[cmf_key]
-        
-        # Đường CMF màu tím dày
         fig.add_trace(go.Scatter(x=df.index, y=c_data["mf"], mode='lines', line=dict(width=2.5, color='#9C27B0'), name='CMF'), row=current_row, col=1)
         fig.add_hline(y=0, line_color="rgba(255,255,255,0.3)", row=current_row, col=1)
         fig.add_hline(y=0.6, line_dash="dash", line_color="rgba(255,255,255,0.1)", row=current_row, col=1)
         fig.add_hline(y=-0.6, line_dash="dash", line_color="rgba(255,255,255,0.1)", row=current_row, col=1)
-        
-        # Nhãn MUA/BÁN hình nhãn dán cứng
-        fig.add_trace(go.Scatter(x=df.index, y=c_data["buy_triggers"], mode='markers+text', text="MUA",
-                                 textposition="bottom center", marker=dict(color='#00E676', size=10, symbol='square'), name='CMF Mua'), row=current_row, col=1)
-        fig.add_trace(go.Scatter(x=df.index, y=c_data["sell_triggers"], mode='markers+text', text="BÁN",
-                                 textposition="top center", marker=dict(color='#FF1744', size=10, symbol='square'), name='CMF Bán'), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=c_data["buy_triggers"], mode='markers+text', text="MUA", textposition="bottom center", marker=dict(color='#00E676', size=10, symbol='square')), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=c_data["sell_triggers"], mode='markers+text', text="BÁN", textposition="top center", marker=dict(color='#FF1744', size=10, symbol='square')), row=current_row, col=1)
         current_row += 1
 
-    # TẦNG 5: ĐỈNH ĐÁY VZO (NẾU ĐƯỢC BẬT)
-    if show_vzo:
-        vzo_key = [k for k in all_plots.keys() if "vzo" in k][0]
+    # 5. ĐỈNH ĐÁY VZO
+    if vzo_key:
         v_data = all_plots[vzo_key]
         fig.add_trace(go.Scatter(x=df.index, y=v_data["vzo"], mode='lines', line=dict(width=2, color='#17a2b8'), name='VZO'), row=current_row, col=1)
-        fig.add_trace(go.Scatter(x=df.index, y=v_data["buy_signals"], mode='markers', marker=dict(color='#00FF00', size=8), name='VZO Mua'), row=current_row, col=1)
-        fig.add_trace(go.Scatter(x=df.index, y=v_data["sell_signals"], mode='markers', marker=dict(color='#FF0000', size=8), name='VZO Bán'), row=current_row, col=1)
+        fig.add_hline(y=60, line_dash="dash", line_color="rgba(255,23,68,0.4)", row=current_row, col=1)
+        fig.add_hline(y=-60, line_dash="dash", line_color="rgba(0,230,118,0.4)", row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=v_data["buy_signals"], mode='markers', marker=dict(color='#00FF00', size=8)), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=v_data["sell_signals"], mode='markers', marker=dict(color='#FF0000', size=8)), row=current_row, col=1)
         current_row += 1
 
-    fig.update_layout(xaxis_rangeslider_visible=False, height=350 + 150 * extra_rows, template='plotly_dark',
-                      margin=dict(l=20, r=20, t=10, b=10), showlegend=False)
+    # 6. SQUEEZE MOMENTUM
+    if sqz_key:
+        s_data = all_plots[sqz_key]
+        sqz_colors = ['#00E676' if v > 0 else '#FF1744' for v in s_data['val']]
+        fig.add_trace(go.Bar(x=df.index, y=s_data['val'], marker_color=sqz_colors, name='SQZ'), row=current_row, col=1)
+        dot_colors = ['#FF1744' if sq else '#00E676' for sq in s_data['sqz_on']]
+        fig.add_trace(go.Scatter(x=df.index, y=[0]*len(df), mode='markers', marker=dict(color=dot_colors, size=4)), row=current_row, col=1)
+        current_row += 1
+
+    fig.update_layout(xaxis_rangeslider_visible=False, height=400 + 150 * extra_rows, template='plotly_dark', margin=dict(l=20, r=20, t=10, b=10), showlegend=False)
     
     with col_right:
         st.subheader(f"📊 Live Chart TradingView Matrix")
