@@ -176,16 +176,16 @@ if not df.empty:
         fig.add_trace(go.Scatter(x=df['time_str'], y=[0]*len(df), mode='markers', marker=dict(color=dot_colors, size=4)), row=current_row, col=1)
         current_row += 1
 
-    # CẤU HÌNH GIAO DIỆN TRADINGVIEW DARK MODE
+    # CẤU HÌNH GIAO DIỆN TRADINGVIEW DARK MODE (Đã sửa lỗi ValueError)
     fig.update_layout(
         plot_bgcolor=TV_BG, paper_bgcolor=TV_BG, font=dict(color=TV_TEXT, size=11),
         xaxis_rangeslider_visible=False, height=500 + 180 * extra_rows,
         margin=dict(l=10, r=40, t=30, b=10), showlegend=False, dragmode='pan', hovermode='x unified'
     )
     
-    # Cấu hình lưới và thước ngắm (Crosshair) cho TẤT CẢ các trục
-    fig.update_xaxes(showgrid=True, gridcolor=TV_GRID, showspikes=True, spikemode='across', spikelinecolor='#787b86', spikesnap='cursor')
-    fig.update_yaxes(showgrid=True, gridcolor=TV_GRID, side='right', showspikes=True, spikelinecolor='#787b86')
+    # Cấu hình lưới an toàn cho TẤT CẢ các trục
+    fig.update_xaxes(showgrid=True, gridcolor=TV_GRID)
+    fig.update_yaxes(showgrid=True, gridcolor=TV_GRID, side='right')
     
     with col_right:
         st.subheader(f"📊 Live Chart TradingView Pro")
