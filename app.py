@@ -9,7 +9,7 @@ st.set_page_config(layout="wide", page_title="Quang Quant Hub", page_icon="⚡")
 SECRET_PASSWORD = "tbk1102"
 
 # 🔴 QUAN TRỌNG: Lấy API Key miễn phí tại https://aistudio.google.com/ và dán vào đây
-GEMINI_API_KEY = "ĐIỀN_API_KEY_GEMINI_CỦA_BẠN_VÀO_ĐÂY" 
+GEMINI_API_KEY = "AIzaSyAq9jRLwgdLgMoF8M1_h2Q0It5RHyceg7w" 
 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
