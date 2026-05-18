@@ -25,20 +25,40 @@ if not st.session_state["logged_in"]:
     st.stop()
 
 # ==========================================================
-# 1. SIDEBAR TRẠNG THÁI & CẤU HÌNH API KEY (MỚI)
+# 1. SIDEBAR TRẠNG THÁI & CẤU HÌNH AI (AUTO-DETECT MODEL)
 # ==========================================================
 st.sidebar.title("🔑 Cấu hình AI (Gemini)")
-# Ô nhập API Key ngay trên giao diện web (an toàn tuyệt đối)
 user_api_key = st.sidebar.text_input("Nhập Gemini API Key của bạn:", type="password", help="Dán API Key lấy từ Google AI Studio vào đây")
 
 if user_api_key:
     try:
         genai.configure(api_key=user_api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash') # Chuyển sang bản Flash mới nhất
-        st.sidebar.success("✅ Đã kết nối não AI!")
+        
+        # --- THUẬT TOÁN AUTO-DETECT: TỰ ĐỘNG TÌM MODEL KHẢ DỤNG ---
+        available_models = []
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                available_models.append(m.name)
+        
+        if not available_models:
+            st.sidebar.error("❌ API Key hợp lệ nhưng tài khoản chưa được cấp quyền dùng Model nào.")
+            model = None
+        else:
+            # Ưu tiên tìm các phiên bản ổn định
+            chosen_model_name = available_models[0].replace('models/', '') 
+            for m_name in available_models:
+                if 'gemini-1.5-flash' in m_name:
+                    chosen_model_name = m_name.replace('models/', '')
+                    break
+                elif 'gemini-1.0-pro' in m_name or 'gemini-pro' in m_name:
+                    chosen_model_name = m_name.replace('models/', '')
+
+            model = genai.GenerativeModel(chosen_model_name)
+            st.sidebar.success(f"✅ Đã kết nối não AI! (Đang chạy: {chosen_model_name})")
+            
     except Exception as e:
         model = None
-        st.sidebar.error("❌ Lỗi cấu hình AI")
+        st.sidebar.error(f"❌ Lỗi cấu hình AI: Kiểm tra lại mạng hoặc API Key.")
 else:
     model = None
     st.sidebar.warning("⚠️ Vui lòng nhập API Key để AI hoạt động.")
