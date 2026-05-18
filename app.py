@@ -28,7 +28,7 @@ if not st.session_state["logged_in"]:
     st.stop()
 
 # Cấu hình AI (ĐÃ FIX LỖI 404 - Dùng bản Pro ổn định nhất)
-if GEMINI_API_KEY != "ĐIỀN_API_KEY_GEMINI_CỦA_BẠN_VÀO_ĐÂY":
+if GEMINI_API_KEY != "AIzaSyAq9jRLwgdLgMoF8M1_h2Q0It5RHyceg7w":
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-1.5-pro')
 else:
