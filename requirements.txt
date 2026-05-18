@@ -5,3 +5,4 @@ yfinance
 requests
 streamlit-autorefresh
 plotly
+google-generativeai
