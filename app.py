@@ -27,10 +27,12 @@ if not st.session_state["logged_in"]:
                 st.error("Mật khẩu sai!")
     st.stop()
 
-# Cấu hình AI (ĐÃ FIX LỖI 404 - Dùng bản Pro ổn định nhất)
-if GEMINI_API_KEY != "AIzaSyAq9jRLwgdLgMoF8M1_h2Q0It5RHyceg7w":
+# Cấu hình AI (Đã chuyển sang bản gemini-pro ổn định nhất cho mọi tài khoản)
+if GEMINI_API_KEY != "ĐIỀN_API_KEY_GEMINI_CỦA_BẠN_VÀO_ĐÂY":
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-pro')
+    
+    # Đổi tên model thành 'gemini-pro'
+    model = genai.GenerativeModel('gemini-pro')
 else:
     model = None
 
