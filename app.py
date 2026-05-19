@@ -1,38 +1,34 @@
 import streamlit as st
 import google.generativeai as genai
 from fpdf import FPDF
-from unidecode import unidecode
 
-# ==========================================================
-# CẤU HÌNH TRANG
-# ==========================================================
+# Cấu hình trang
 st.set_page_config(layout="wide", page_title="Quang Quant Hub", page_icon="⚡")
 
 # ==========================================================
-# 1. HÀM TẠO PDF (KHỬ DẤU ĐỂ KHÔNG LỖI FONT)
+# 1. HÀM TẠO PDF (SỬ DỤNG FPDF2 - SIÊU ỔN ĐỊNH)
 # ==========================================================
 def create_pdf(text):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    # Khử dấu tiếng Việt để PDF hiển thị ổn định 100%
-    clean_text = unidecode(text)
-    pdf.multi_cell(0, 10, txt=clean_text)
-    return pdf.output(dest='S').encode('latin-1')
+    # Sử dụng font tiêu chuẩn của fpdf2
+    pdf.set_font("Helvetica", size=12)
+    # Ghi nội dung (fpdf2 xử lý text trực tiếp cực tốt)
+    pdf.multi_cell(0, 10, txt=text)
+    # Xuất ra bytes
+    return pdf.output()
 
 # ==========================================================
-# 2. KHỞI TẠO AI (DÒ TÌM TỰ ĐỘNG)
+# 2. KHỞI TẠO AI
 # ==========================================================
 model = None
 try:
-    # Lấy API Key từ Secrets của Streamlit (bảo mật tuyệt đối)
     genai.configure(api_key=st.secrets["API_KEY"])
-    # Tự động lấy model khả dụng
     models = [m for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
     if models:
         model = genai.GenerativeModel(models[0].name)
-except Exception as e:
-    st.sidebar.error(f"❌ Lỗi cấu hình AI: {e}")
+except:
+    pass
 
 # ==========================================================
 # 3. BẢO MẬT HỆ THỐNG
@@ -54,42 +50,39 @@ if not st.session_state["logged_in"]:
 st.title("⚡ Quant Trading Hub - AI Strategist")
 st.sidebar.title("📡 System Status")
 
-if model: st.sidebar.success("✅ AI ĐÃ KẾT NỐI")
+if model: st.sidebar.success("✅ AI SẴN SÀNG")
 else: st.sidebar.error("❌ CHƯA CÓ API KEY")
 
-indicator_data = st.session_state.get('tech_indicators', "⚠️ Chưa có dữ liệu Kỹ thuật.")
-st.markdown(f"**Trạng thái:** Hệ thống đang hoạt động ổn định.")
+indicator_data = st.session_state.get('tech_indicators', "⚠️ Chưa có dữ liệu.")
+st.markdown(f"**Trạng thái:** Hệ thống đang hoạt động.")
 
 c1, c2 = st.columns([1, 1])
 
 with c1:
     st.subheader("⚙️ Dữ liệu đầu vào")
-    with st.expander("Dữ liệu thô"):
-        st.code(indicator_data, language="text")
+    st.code(indicator_data, language="text")
 
 with c2:
-    st.subheader("🤖 AI Phân tích & Xuất Báo Cáo")
+    st.subheader("🤖 AI Phân tích")
     if st.button("🚀 KÍCH HOẠT PHÂN TÍCH", type="primary", use_container_width=True):
         if not model:
-            st.error("❌ Lỗi kết nối AI. Kiểm tra Secrets.")
+            st.error("❌ Lỗi kết nối AI.")
         else:
-            with st.spinner("🧠 AI đang lập báo cáo chuyên sâu..."):
+            with st.spinner("🧠 AI đang lập báo cáo..."):
                 try:
-                    # Gửi prompt cho AI
-                    prompt = f"Phân tích dữ liệu kỹ thuật: {indicator_data}. Đưa ra đánh giá xu hướng và kế hoạch hành động giao dịch chuyên nghiệp cho XAU/USD. Format Markdown."
-                    response = model.generate_content(prompt)
+                    response = model.generate_content(f"Phân tích dữ liệu: {indicator_data}. Đưa ra chiến lược giao dịch chuyên nghiệp cho XAU/USD.")
                     st.session_state['ai_report'] = response.text
                     st.success("✅ Phân tích xong!")
                 except Exception as e:
-                    st.error(f"❌ Lỗi AI: {e}")
+                    st.error(f"❌ Lỗi: {e}")
 
-    # Xuất file PDF sau khi có báo cáo
+    # Xuất file PDF (đã fix lỗi Unicode)
     if 'ai_report' in st.session_state:
         st.markdown("---")
-        pdf_data = create_pdf(st.session_state['ai_report'])
+        pdf_bytes = create_pdf(st.session_state['ai_report'])
         st.download_button(
             label="📄 TẢI BÁO CÁO DẠNG PDF",
-            data=pdf_data,
+            data=pdf_bytes,
             file_name="Bao_Cao_Trading.pdf",
             mime="application/pdf",
             use_container_width=True
