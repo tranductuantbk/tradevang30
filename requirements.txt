@@ -7,4 +7,3 @@ streamlit-autorefresh
 plotly
 google-generativeai
 fpdf2
-unidecode
