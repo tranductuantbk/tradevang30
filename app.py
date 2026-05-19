@@ -4,7 +4,7 @@ import google.generativeai as genai
 # ==========================================================
 # CẤU HÌNH CỨNG (ĐIỀN KEY CỦA BẠN VÀO ĐÂY)
 # ==========================================================
-MY_API_KEY = "THAY_API_KEY_CUA_BAN_VAO_DAY" 
+MY_API_KEY = "AIzaSyAq9jRLwgdLgMoF8M1_h2Q0It5RHyceg7w" 
 
 st.set_page_config(layout="wide", page_title="Quang Quant Hub", page_icon="⚡")
 
