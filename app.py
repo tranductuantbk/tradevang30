@@ -4,15 +4,28 @@ import google.generativeai as genai
 st.set_page_config(layout="wide", page_title="Quang Quant Hub", page_icon="⚡")
 
 # ==========================================================
-# 1. CẤU HÌNH AI (LẤY TỪ SECRETS - KHÔNG ĐỂ LỘ KEY)
+# 1. CẤU HÌNH & KHỞI TẠO AI (DÒ TÌM TỰ ĐỘNG)
 # ==========================================================
-model = None
+# Lấy key từ secrets
 try:
-    # Tự động lấy API_KEY từ cài đặt bảo mật của Streamlit
     genai.configure(api_key=st.secrets["API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    # --- TỰ ĐỘNG DÒ TÌM MODEL ---
+    # Lấy danh sách tất cả model khả dụng
+    all_models = [m for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    
+    if all_models:
+        # Chọn model đầu tiên tìm được
+        model_name = all_models[0].name
+        model = genai.GenerativeModel(model_name)
+        st.sidebar.success(f"✅ Đã kết nối: {model_name}")
+    else:
+        model = None
+        st.sidebar.error("❌ Không tìm thấy model nào hỗ trợ!")
+        
 except Exception as e:
-    st.sidebar.error("❌ Chưa thiết lập Secrets hoặc Key lỗi. Xem hướng dẫn!")
+    model = None
+    st.sidebar.error(f"❌ Lỗi: {e}")
 
 # ==========================================================
 # 2. BẢO MẬT HỆ THỐNG
@@ -35,20 +48,21 @@ if not st.session_state["logged_in"]:
 # ==========================================================
 # 3. GIAO DIỆN CHÍNH
 # ==========================================================
-st.sidebar.title("📡 System Status")
-if model: st.sidebar.success("✅ AI SẴN SÀNG")
-else: st.sidebar.error("❌ AI CHƯA KẾT NỐI")
-
-indicator_data = st.session_state.get('tech_indicators', "⚠️ Chưa có dữ liệu Kỹ thuật.")
-live_price = st.session_state.get('current_price', 0.0)
-
 st.title("⚡ Quant Trading Hub")
-st.markdown(f"**Mã theo dõi:** XAU/USD | **Giá:** `{live_price:,.2f}`")
+
+# Phần Debug: Hiển thị các model bạn đang có
+with st.sidebar.expander("🛠️ Debug Model"):
+    st.write("Các model khả dụng của bạn:")
+    try:
+        for m in all_models: st.write(f"- {m.name}")
+    except: st.write("Chưa kết nối được.")
+
+indicator_data = st.session_state.get('tech_indicators', "⚠️ Chưa có dữ liệu.")
 
 c1, c2 = st.columns([1, 1])
 
 with c1:
-    analysis_mode = st.selectbox("🧠 Nguồn dữ liệu:", ["1. Phân tích Kỹ thuật", "2. Phân tích Vĩ mô", "3. Tổng hợp"])
+    st.subheader("⚙️ Dữ liệu")
     with st.expander("Dữ liệu thô"):
         st.code(indicator_data, language="text")
 
@@ -56,20 +70,19 @@ with c2:
     st.subheader("🤖 Phân Tích & Xuất Báo Cáo")
     if st.button("🚀 KÍCH HOẠT AI PHÂN TÍCH", use_container_width=True, type="primary"):
         if not model:
-            st.error("❌ Model AI không hoạt động. Kiểm tra lại API_KEY trong Secrets.")
+            st.error("❌ Chưa kết nối được Model AI. Kiểm tra phần Debug ở Sidebar.")
         else:
-            with st.spinner("🧠 AI đang âm thầm lập báo cáo..."):
+            with st.spinner("🧠 AI đang lập báo cáo..."):
                 try:
-                    prompt = f"Phân tích chuyên sâu cho quỹ đầu tư về dữ liệu: {indicator_data}. Đưa ra xu hướng và kế hoạch hành động."
-                    response = model.generate_content(prompt)
+                    response = model.generate_content(f"Phân tích dữ liệu: {indicator_data}. Đưa ra kế hoạch hành động.")
                     st.session_state['ai_report'] = response.text
-                    st.success("✅ Phân tích hoàn tất!")
+                    st.success("✅ Phân tích xong!")
                 except Exception as e:
-                    st.error(f"❌ Lỗi: {e}")
+                    st.error(f"❌ Lỗi API: {e}")
 
     if 'ai_report' in st.session_state:
         st.download_button(
-            label="📄 TẢI BÁO CÁO PHÂN TÍCH (.md)",
+            label="📄 TẢI BÁO CÁO (.md)",
             data=st.session_state['ai_report'],
             file_name="Bao_Cao_Giao_Dich.md",
             mime="text/markdown",
