@@ -1,81 +1,99 @@
 import streamlit as st
 import google.generativeai as genai
+from fpdf import FPDF
 
 # Cấu hình trang
-st.set_page_config(layout="wide", page_title="Quang Quant Hub", page_icon="⚡")
+st.set_page_config(layout="wide", page_title="Quant Trading Hub", page_icon="⚡")
 
 # ==========================================================
-# 0. BẢO MẬT HỆ THỐNG
+# 1. HÀM TẠO PDF (FPD2 + UNICODE HỖ TRỢ TIẾNG VIỆT)
 # ==========================================================
-SECRET_PASSWORD = "tbk1102"
+def create_pdf(text):
+    pdf = FPDF()
+    pdf.add_page()
+    # FPDF2 mặc định hỗ trợ Unicode tốt với các font tiêu chuẩn
+    pdf.set_font("Helvetica", size=12)
+    pdf.multi_cell(0, 10, txt=text)
+    return pdf.output()
 
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
+# ==========================================================
+# 2. KHỞI TẠO AI (BẢO MẬT & DÒ TÌM)
+# ==========================================================
+model = None
+try:
+    genai.configure(api_key=st.secrets["API_KEY"])
+    models = [m for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    if models:
+        model = genai.GenerativeModel(models[0].name)
+except:
+    pass
+
+# ==========================================================
+# 3. BẢO MẬT HỆ THỐNG
+# ==========================================================
+if "logged_in" not in st.session_state: st.session_state["logged_in"] = False
 
 if not st.session_state["logged_in"]:
     col_a, col_b, col_c = st.columns([1, 1, 1])
     with col_b:
         st.title("🔒 Security Portal")
-        pwd = st.text_input("Nhập mật khẩu truy cập:", type="password")
-        if st.button("Truy cập hệ thống", use_container_width=True):
-            if pwd == SECRET_PASSWORD:
-                st.session_state["logged_in"] = True
-                st.rerun()
-            else:
-                st.error("Mật khẩu sai!")
+        if st.text_input("Nhập mật khẩu:", type="password") == "tbk1102":
+            st.session_state["logged_in"] = True
+            st.rerun()
     st.stop()
 
 # ==========================================================
-# 1. CẤU HÌNH AI
-# ==========================================================
-st.sidebar.title("🔑 Cấu hình AI")
-# Lấy API Key từ Secrets để bảo mật
-try:
-    api_key = st.secrets["API_KEY"]
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except:
-    st.sidebar.error("❌ Chưa thiết lập API_KEY trong Secrets.")
-    st.stop()
-
-# ==========================================================
-# 2. GIAO DIỆN CHÍNH
+# 4. GIAO DIỆN CHÍNH
 # ==========================================================
 st.title("⚡ Quant Trading Hub - AI Strategist")
+st.sidebar.title("📡 System Status")
 
-# Mock data (thay thế giá thực nếu cần)
-live_price = 2350.5 
+if model: st.sidebar.success("✅ AI SẴN SÀNG")
+else: st.sidebar.error("❌ CHƯA CÓ API KEY")
 
-c1, c2 = st.columns([1, 1])
+# Nhập dữ liệu
+st.subheader("⚙️ Dữ liệu đầu vào")
+indicator_data = st.text_area("Nhập dữ liệu phân tích kỹ thuật:", value="RSI: 30, VZO: -5, Trend: Bearish", height=100)
 
-with c1:
-    st.subheader("⚙️ Dữ liệu thị trường")
-    indicator_data = st.text_area("Nhập dữ liệu phân tích kỹ thuật:", value="RSI: 30, VZO: -5, Trend: Bearish", height=150)
-    
-    if st.button("🚀 PHÂN TÍCH AI", type="primary"):
-        with st.spinner("Đang phân tích..."):
-            prompt = f"""
-            Phân tích dữ liệu: {indicator_data}.
-            1. Đánh giá xu hướng hiện tại.
-            2. Đưa ra KẾ HOẠCH GIAO DỊCH (Entry, SL, TP).
-            3. Trình bày chuyên nghiệp bằng tiếng Việt.
-            """
-            response = model.generate_content(prompt)
-            st.session_state['ai_report'] = response.text
-            st.success("✅ Phân tích xong!")
+# Cấu hình AI
+st.subheader("🤖 Cấu hình Phân tích")
+analysis_focus = st.multiselect(
+    "Chọn mục tiêu phân tích:",
+    ["Phân tích Kỹ thuật (Technical)", "Phân tích Vĩ mô (Macro)", "Đánh giá Rủi ro (Risk)", "Chiến lược Entry/SL/TP"],
+    default=["Phân tích Kỹ thuật (Technical)", "Chiến lược Entry/SL/TP"]
+)
 
-with c2:
-    st.subheader("📋 Kết quả phân tích")
-    if 'ai_report' in st.session_state:
-        st.markdown(st.session_state['ai_report'])
-        
-        # NÚT TẢI BÁO CÁO (Giải pháp Markdown cho iOS)
-        st.download_button(
-            label="📄 TẢI BÁO CÁO (.md)",
-            data=st.session_state['ai_report'],
-            file_name="Bao_Cao_Giao_Dich.md",
-            mime="text/markdown",
-            use_container_width=True
-        )
+if st.button("🚀 KÍCH HOẠT PHÂN TÍCH", type="primary", use_container_width=True):
+    if not model:
+        st.error("❌ Lỗi kết nối AI.")
     else:
-        st.info("Chờ dữ liệu phân tích...")
+        with st.spinner("🧠 AI đang lập báo cáo chuyên sâu..."):
+            try:
+                focus_str = ", ".join(analysis_focus)
+                prompt = f"""
+                Phân tích dữ liệu kỹ thuật: {indicator_data}. 
+                Mục tiêu cần tập trung: {focus_str}.
+                Hãy đưa ra đánh giá xu hướng và kế hoạch hành động giao dịch chuyên nghiệp cho XAU/USD. 
+                Trình bày bằng tiếng Việt.
+                """
+                response = model.generate_content(prompt)
+                st.session_state['ai_report'] = response.text
+                st.success("✅ Phân tích xong!")
+            except Exception as e:
+                st.error(f"❌ Lỗi: {e}")
+
+# Xuất kết quả
+if 'ai_report' in st.session_state:
+    st.markdown("---")
+    st.subheader("📋 Kết quả phân tích")
+    st.markdown(st.session_state['ai_report'])
+    
+    # Xuất PDF
+    pdf_bytes = create_pdf(st.session_state['ai_report'])
+    st.download_button(
+        label="📄 TẢI BÁO CÁO (PDF TỐI ƯU iOS)",
+        data=pdf_bytes,
+        file_name="Bao_Cao_Trading.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
