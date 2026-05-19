@@ -6,5 +6,5 @@ requests
 streamlit-autorefresh
 plotly
 google-generativeai
-fpdf
+fpdf2
 unidecode
