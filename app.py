@@ -3,26 +3,21 @@ import google.generativeai as genai
 from fpdf import FPDF
 from unidecode import unidecode
 
-# Cấu hình trang
+# ==========================================================
+# CẤU HÌNH TRANG
+# ==========================================================
 st.set_page_config(layout="wide", page_title="Quang Quant Hub", page_icon="⚡")
 
 # ==========================================================
-# 1. HÀM TẠO PDF (ĐÃ KHỬ DẤU ĐỂ KHÔNG LỖI FONT)
+# 1. HÀM TẠO PDF (KHỬ DẤU ĐỂ KHÔNG LỖI FONT)
 # ==========================================================
 def create_pdf(text):
     pdf = FPDF()
     pdf.add_page()
-    
-    # Nạp font Arial hỗ trợ tiếng Việt (cần file Arial.ttf trong thư mục dự án)
-    try:
-        pdf.add_font('Arial', '', 'Arial.ttf', uni=True)
-        pdf.set_font("Arial", size=12)
-    except:
-        # Dự phòng nếu không tìm thấy file font, sẽ dùng font mặc định
-        pdf.set_font("Arial", size=12)
-    
-    # Ghi nội dung (Không cần unidecode nữa, cứ để nguyên văn bản tiếng Việt)
-    pdf.multi_cell(0, 10, txt=text)
+    pdf.set_font("Arial", size=12)
+    # Khử dấu tiếng Việt để PDF hiển thị ổn định 100%
+    clean_text = unidecode(text)
+    pdf.multi_cell(0, 10, txt=clean_text)
     return pdf.output(dest='S').encode('latin-1')
 
 # ==========================================================
@@ -30,11 +25,9 @@ def create_pdf(text):
 # ==========================================================
 model = None
 try:
-    # Lấy API Key từ Secrets của Streamlit
-    api_key = st.secrets["API_KEY"]
-    genai.configure(api_key=api_key)
-    
-    # Tự động dò tìm model khả dụng
+    # Lấy API Key từ Secrets của Streamlit (bảo mật tuyệt đối)
+    genai.configure(api_key=st.secrets["API_KEY"])
+    # Tự động lấy model khả dụng
     models = [m for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
     if models:
         model = genai.GenerativeModel(models[0].name)
@@ -42,7 +35,7 @@ except Exception as e:
     st.sidebar.error(f"❌ Lỗi cấu hình AI: {e}")
 
 # ==========================================================
-# 3. BẢO MẬT & ĐĂNG NHẬP
+# 3. BẢO MẬT HỆ THỐNG
 # ==========================================================
 if "logged_in" not in st.session_state: st.session_state["logged_in"] = False
 
@@ -53,7 +46,7 @@ if not st.session_state["logged_in"]:
         if st.text_input("Nhập mật khẩu:", type="password") == "tbk1102":
             st.session_state["logged_in"] = True
             st.rerun()
-        else: st.stop()
+    st.stop()
 
 # ==========================================================
 # 4. GIAO DIỆN CHÍNH
@@ -61,10 +54,10 @@ if not st.session_state["logged_in"]:
 st.title("⚡ Quant Trading Hub - AI Strategist")
 st.sidebar.title("📡 System Status")
 
-if model: st.sidebar.success("✅ AI SẴN SÀNG")
+if model: st.sidebar.success("✅ AI ĐÃ KẾT NỐI")
 else: st.sidebar.error("❌ CHƯA CÓ API KEY")
 
-indicator_data = st.session_state.get('tech_indicators', "⚠️ Chưa có dữ liệu.")
+indicator_data = st.session_state.get('tech_indicators', "⚠️ Chưa có dữ liệu Kỹ thuật.")
 st.markdown(f"**Trạng thái:** Hệ thống đang hoạt động ổn định.")
 
 c1, c2 = st.columns([1, 1])
@@ -75,21 +68,22 @@ with c1:
         st.code(indicator_data, language="text")
 
 with c2:
-    st.subheader("🤖 AI Phân tích")
+    st.subheader("🤖 AI Phân tích & Xuất Báo Cáo")
     if st.button("🚀 KÍCH HOẠT PHÂN TÍCH", type="primary", use_container_width=True):
         if not model:
-            st.error("❌ Lỗi kết nối AI.")
+            st.error("❌ Lỗi kết nối AI. Kiểm tra Secrets.")
         else:
-            with st.spinner("🧠 AI đang lập báo cáo..."):
+            with st.spinner("🧠 AI đang lập báo cáo chuyên sâu..."):
                 try:
-                    prompt = f"Phân tích dữ liệu kỹ thuật: {indicator_data}. Đưa ra chiến lược giao dịch chuyên nghiệp cho XAU/USD. Format báo cáo Markdown."
+                    # Gửi prompt cho AI
+                    prompt = f"Phân tích dữ liệu kỹ thuật: {indicator_data}. Đưa ra đánh giá xu hướng và kế hoạch hành động giao dịch chuyên nghiệp cho XAU/USD. Format Markdown."
                     response = model.generate_content(prompt)
                     st.session_state['ai_report'] = response.text
                     st.success("✅ Phân tích xong!")
                 except Exception as e:
-                    st.error(f"❌ Lỗi: {e}")
+                    st.error(f"❌ Lỗi AI: {e}")
 
-    # Xuất file PDF (không hiển thị report lên web để giữ sạch giao diện)
+    # Xuất file PDF sau khi có báo cáo
     if 'ai_report' in st.session_state:
         st.markdown("---")
         pdf_data = create_pdf(st.session_state['ai_report'])
