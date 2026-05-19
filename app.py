@@ -2,21 +2,26 @@ import streamlit as st
 import google.generativeai as genai
 
 # ==========================================================
-# CẤU HÌNH CỨNG (ĐIỀN KEY CỦA BẠN VÀO ĐÂY)
+# 1. CẤU HÌNH CỨNG (ĐIỀN KEY CỦA BẠN VÀO ĐÂY)
 # ==========================================================
 MY_API_KEY = "AIzaSyAq9jRLwgdLgMoF8M1_h2Q0It5RHyceg7w" 
 
 st.set_page_config(layout="wide", page_title="Quang Quant Hub", page_icon="⚡")
 
-# Khởi tạo AI
+# ==========================================================
+# 2. KHỞI TẠO VÀ KIỂM TRA KẾT NỐI AI (BỘ PHẬN MỚI)
+# ==========================================================
+model = None
+connection_error = None
+
 try:
     genai.configure(api_key=MY_API_KEY)
     model = genai.GenerativeModel('gemini-1.5-flash')
-except:
-    model = None
+except Exception as e:
+    connection_error = str(e)
 
 # ==========================================================
-# 0. BẢO MẬT HỆ THỐNG
+# 3. BẢO MẬT HỆ THỐNG
 # ==========================================================
 SECRET_PASSWORD = "tbk1102"
 
@@ -37,16 +42,21 @@ if not st.session_state["logged_in"]:
     st.stop()
 
 # ==========================================================
-# 1. TRẠNG THÁI HỆ THỐNG
+# 4. THANH TRẠNG THÁI (ĐÈN BÁO KẾT NỐI)
 # ==========================================================
 st.sidebar.title("📡 System Status")
+
+# Hiển thị đèn báo AI
+if model is not None:
+    st.sidebar.success("✅ AI ĐÃ KẾT NỐI")
+else:
+    st.sidebar.error(f"❌ LỖI AI: {connection_error}")
+
 indicator_data = st.session_state.get('tech_indicators', "⚠️ Chưa có dữ liệu Kỹ thuật.")
 live_price = st.session_state.get('current_price', 0.0)
 fed_news_data = st.session_state.get('fed_news', "Chưa có dữ liệu tin tức FED.")
 
-if "⚠️" in indicator_data:
-    st.sidebar.warning("Kỹ thuật: Chờ dữ liệu")
-else:
+if "⚠️" not in indicator_data:
     st.sidebar.success(f"✅ Giá: {live_price:,.2f}")
     st.sidebar.success("✅ Kỹ thuật: ONLINE")
     
@@ -55,7 +65,7 @@ if st.sidebar.button("🚪 Đăng xuất"):
     st.rerun()
 
 # ==========================================================
-# 2. BẢNG ĐIỀU KHIỂN CHÍNH
+# 5. BẢNG ĐIỀU KHIỂN CHÍNH
 # ==========================================================
 st.title("⚡ Quant Trading Hub - AI Strategist")
 st.markdown(f"**Mã theo dõi:** XAU/USD | **Giá hiện tại:** `{live_price:,.2f}`")
@@ -65,10 +75,7 @@ c1, c2 = st.columns([1, 1])
 
 with c1:
     st.subheader("⚙️ Chọn Module Phân Tích")
-    analysis_mode = st.selectbox(
-        "🧠 Nguồn dữ liệu:",
-        ["1. Phân tích Kỹ thuật", "2. Phân tích Vĩ mô", "3. Tổng hợp Toàn diện"]
-    )
+    analysis_mode = st.selectbox("🧠 Nguồn dữ liệu:", ["1. Phân tích Kỹ thuật", "2. Phân tích Vĩ mô", "3. Tổng hợp Toàn diện"])
     with st.expander("Dữ liệu thô"):
         st.code(indicator_data, language="text")
 
@@ -77,7 +84,7 @@ with c2:
     
     if st.button("🚀 KÍCH HOẠT AI PHÂN TÍCH", use_container_width=True, type="primary"):
         if model is None:
-            st.error("❌ API Key không hợp lệ! Kiểm tra lại code.")
+            st.error("❌ Không thể kết nối AI. Kiểm tra đèn báo ở thanh bên!")
         else:
             with st.spinner("🧠 AI đang âm thầm lập báo cáo..."):
                 data_to_analyze = f"Kỹ thuật: {indicator_data}\nVĩ mô: {fed_news_data}"
@@ -88,7 +95,7 @@ with c2:
                     st.session_state['ai_report'] = response.text
                     st.success("✅ Phân tích hoàn tất!")
                 except Exception as e:
-                    st.error(f"❌ Lỗi AI: {e}")
+                    st.error(f"❌ Lỗi khi gọi AI: {e}")
 
     # Xuất file báo cáo
     if 'ai_report' in st.session_state:
