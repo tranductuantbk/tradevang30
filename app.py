@@ -12,10 +12,17 @@ st.set_page_config(layout="wide", page_title="Quang Quant Hub", page_icon="⚡")
 def create_pdf(text):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    # Dùng unidecode để chuyển tiếng Việt có dấu thành không dấu
-    clean_text = unidecode(text)
-    pdf.multi_cell(0, 10, txt=clean_text)
+    
+    # Nạp font Arial hỗ trợ tiếng Việt (cần file Arial.ttf trong thư mục dự án)
+    try:
+        pdf.add_font('Arial', '', 'Arial.ttf', uni=True)
+        pdf.set_font("Arial", size=12)
+    except:
+        # Dự phòng nếu không tìm thấy file font, sẽ dùng font mặc định
+        pdf.set_font("Arial", size=12)
+    
+    # Ghi nội dung (Không cần unidecode nữa, cứ để nguyên văn bản tiếng Việt)
+    pdf.multi_cell(0, 10, txt=text)
     return pdf.output(dest='S').encode('latin-1')
 
 # ==========================================================
