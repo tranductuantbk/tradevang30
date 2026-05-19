@@ -1,77 +1,81 @@
 import streamlit as st
 import google.generativeai as genai
-from fpdf import FPDF
 
 # Cấu hình trang
 st.set_page_config(layout="wide", page_title="Quang Quant Hub", page_icon="⚡")
 
 # ==========================================================
-# 1. HÀM TẠO PDF (TỐI ƯU CHO iOS - UTF-8)
+# 0. BẢO MẬT HỆ THỐNG
 # ==========================================================
-def create_pdf(text):
-    # Sử dụng fpdf2, bật chế độ hỗ trợ Unicode
-    pdf = FPDF()
-    pdf.add_page()
-    # fpdf2 có font Helvetica hỗ trợ Unicode tốt
-    pdf.set_font("Helvetica", size=12)
-    # Ghi nội dung, tự động xuống dòng
-    pdf.multi_cell(0, 10, txt=text)
-    # Trả về bytes
-    return pdf.output()
+SECRET_PASSWORD = "tbk1102"
 
-# ==========================================================
-# 2. KHỞI TẠO AI & ĐĂNG NHẬP
-# ==========================================================
-if "logged_in" not in st.session_state: st.session_state["logged_in"] = False
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
 
 if not st.session_state["logged_in"]:
-    col_b = st.columns([1, 1, 1])[1]
+    col_a, col_b, col_c = st.columns([1, 1, 1])
     with col_b:
         st.title("🔒 Security Portal")
-        if st.text_input("Nhập mật khẩu:", type="password") == "tbk1102":
-            st.session_state["logged_in"] = True
-            st.rerun()
+        pwd = st.text_input("Nhập mật khẩu truy cập:", type="password")
+        if st.button("Truy cập hệ thống", use_container_width=True):
+            if pwd == SECRET_PASSWORD:
+                st.session_state["logged_in"] = True
+                st.rerun()
+            else:
+                st.error("Mật khẩu sai!")
     st.stop()
 
-# Khởi tạo AI (chỉ chạy khi đã đăng nhập)
-model = None
+# ==========================================================
+# 1. CẤU HÌNH AI
+# ==========================================================
+st.sidebar.title("🔑 Cấu hình AI")
+# Lấy API Key từ Secrets để bảo mật
 try:
-    genai.configure(api_key=st.secrets["API_KEY"])
-    models = [m for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    if models: model = genai.GenerativeModel(models[0].name)
-except: pass
+    api_key = st.secrets["API_KEY"]
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+except:
+    st.sidebar.error("❌ Chưa thiết lập API_KEY trong Secrets.")
+    st.stop()
 
 # ==========================================================
-# 3. GIAO DIỆN CHÍNH
+# 2. GIAO DIỆN CHÍNH
 # ==========================================================
-st.title("⚡ Quant Trading Hub")
-indicator_data = st.session_state.get('tech_indicators', "⚠️ Chưa có dữ liệu.")
+st.title("⚡ Quant Trading Hub - AI Strategist")
+
+# Mock data (thay thế giá thực nếu cần)
+live_price = 2350.5 
 
 c1, c2 = st.columns([1, 1])
+
 with c1:
-    st.subheader("⚙️ Dữ liệu đầu vào")
-    st.code(indicator_data, language="text")
+    st.subheader("⚙️ Dữ liệu thị trường")
+    indicator_data = st.text_area("Nhập dữ liệu phân tích kỹ thuật:", value="RSI: 30, VZO: -5, Trend: Bearish", height=150)
+    
+    if st.button("🚀 PHÂN TÍCH AI", type="primary"):
+        with st.spinner("Đang phân tích..."):
+            prompt = f"""
+            Phân tích dữ liệu: {indicator_data}.
+            1. Đánh giá xu hướng hiện tại.
+            2. Đưa ra KẾ HOẠCH GIAO DỊCH (Entry, SL, TP).
+            3. Trình bày chuyên nghiệp bằng tiếng Việt.
+            """
+            response = model.generate_content(prompt)
+            st.session_state['ai_report'] = response.text
+            st.success("✅ Phân tích xong!")
 
 with c2:
-    st.subheader("🤖 AI Phân tích")
-    if st.button("🚀 KÍCH HOẠT PHÂN TÍCH", type="primary", use_container_width=True):
-        if not model: st.error("Lỗi AI.")
-        else:
-            with st.spinner("Đang lập báo cáo..."):
-                try:
-                    response = model.generate_content(f"Phân tích dữ liệu: {indicator_data}. Đưa ra chiến lược giao dịch chuyên nghiệp cho XAU/USD.")
-                    st.session_state['ai_report'] = response.text
-                    st.success("✅ Phân tích xong!")
-                except Exception as e: st.error(f"Lỗi: {e}")
-
-    # Xuất PDF
+    st.subheader("📋 Kết quả phân tích")
     if 'ai_report' in st.session_state:
-        st.markdown("---")
-        pdf_data = create_pdf(st.session_state['ai_report'])
+        st.markdown(st.session_state['ai_report'])
+        
+        # NÚT TẢI BÁO CÁO (Giải pháp Markdown cho iOS)
         st.download_button(
-            label="📄 TẢI BÁO CÁO (PDF - Tối ưu iOS)",
-            data=pdf_data,
-            file_name="Bao_Cao_Trading.pdf",
-            mime="application/pdf",
+            label="📄 TẢI BÁO CÁO (.md)",
+            data=st.session_state['ai_report'],
+            file_name="Bao_Cao_Giao_Dich.md",
+            mime="text/markdown",
             use_container_width=True
         )
+    else:
+        st.info("Chờ dữ liệu phân tích...")
