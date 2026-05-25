@@ -11,10 +11,7 @@ import numpy as np
 
 st.set_page_config(page_title="Module Chỉ Báo", layout="wide", initial_sidebar_state="collapsed")
 
-if "logged_in" not in st.session_state or not st.session_state["logged_in"]:
-    st.warning("🔒 Vui lòng quay lại trang chủ để đăng nhập trước khi sử dụng công cụ này.")
-    if st.button("Đi tới trang chủ"): st.switch_page("app.py")
-    st.stop()
+# ĐÃ XÓA BỎ LỚP BẢO VỆ ĐĂNG NHẬP (PASSWORD/LOGIN) TẠI ĐÂY
 
 st_autorefresh(interval=60000, key="live_refresh")
 
