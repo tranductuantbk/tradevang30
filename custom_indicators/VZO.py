@@ -65,7 +65,7 @@ def run_indicator(df):
         supertrend.iloc[i] = final_lb.iloc[i] if macro_trend.iloc[i] == 1 else final_ub.iloc[i]
 
     # ==========================================================
-    # 2. TÍNH TOÁN DÒNG TIỀN VZO 
+    # 2. TÍNH TOÁN DÒNG TIỀN VZO (ĐÃ FIX LỖI INDEX)
     # ==========================================================
     vol_dir = np.where(close > close.shift(1), volume, -volume)
     
@@ -113,7 +113,7 @@ def run_indicator(df):
             is_ready_sell = False 
 
     # ==========================================================
-    # 4. TRẢ DỮ LIỆU VỀ STREAMLIT (NÂNG CẤP XUẤT THỜI GIAN)
+    # 4. TRẢ DỮ LIỆU VỀ STREAMLIT (GIỜ VIỆT NAM + ĐỔI TÊN)
     # ==========================================================
     plot_data = {
         "vzo": vzo,
@@ -122,21 +122,32 @@ def run_indicator(df):
     }
     
     last_signal = "Bình thường"
-    # Quét ngược từ nến hiện tại về quá khứ 10 nến để bắt mốc thời gian chính xác
+    
     for i in range(len(df)-1, max(0, len(df)-11), -1):
         if not np.isnan(buy_signals.iloc[i]):
-            timestamp = df.index[i]
-            # Kiểm tra nếu định dạng là datetime thì format đẹp, nếu là chuỗi thì lấy luôn
-            time_str = timestamp.strftime('%H:%M:%S %d/%m/%Y') if hasattr(timestamp, 'strftime') else str(timestamp)
-            last_signal = f"VZO: Đỉnh Đáy VZO - KIỆT SỨC BÁN lúc {time_str} (Chuẩn bị Tăng theo Supertrend)"
+            try:
+                timestamp = pd.to_datetime(df.index[i])
+                # Ép sang giờ VN (cộng 7 tiếng). Nếu dữ liệu API tải về đã là giờ VN, bạn chỉ cần sửa + pd.Timedelta(hours=0)
+                timestamp_vn = timestamp + pd.Timedelta(hours=7) 
+                time_str = timestamp_vn.strftime('%H:%M:%S %d/%m/%Y')
+            except:
+                time_str = str(df.index[i])
+                
+            last_signal = f"Đỉnh Đáy VZO - KIỆT SỨC BÁN lúc {time_str} (Chuẩn bị Tăng)"
             break
+            
         elif not np.isnan(sell_signals.iloc[i]):
-            timestamp = df.index[i]
-            time_str = timestamp.strftime('%H:%M:%S %d/%m/%Y') if hasattr(timestamp, 'strftime') else str(timestamp)
-            last_signal = f"VZO: Đỉnh Đáy VZO - KIỆT SỨC MUA lúc {time_str} (Chuẩn bị Giảm theo Supertrend)"
+            try:
+                timestamp = pd.to_datetime(df.index[i])
+                timestamp_vn = timestamp + pd.Timedelta(hours=7)
+                time_str = timestamp_vn.strftime('%H:%M:%S %d/%m/%Y')
+            except:
+                time_str = str(df.index[i])
+                
+            last_signal = f"Đỉnh Đáy VZO - KIỆT SỨC MUA lúc {time_str} (Chuẩn bị Giảm)"
             break
             
     if last_signal == "Bình thường":
-        last_signal = f"VZO: Đang chạy trong Trend {'TĂNG' if macro_trend.iloc[-1] == 1 else 'GIẢM'}"
+        last_signal = f"Đỉnh Đáy VZO - Đang chạy trong Trend {'TĂNG' if macro_trend.iloc[-1] == 1 else 'GIẢM'}"
         
     return last_signal, plot_data
