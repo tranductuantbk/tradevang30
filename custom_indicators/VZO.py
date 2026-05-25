@@ -7,8 +7,12 @@ def rma(series, length):
 
 def run_indicator(df):
     # ==========================================================
-    # 1. CÀI ĐẶT THÔNG SỐ VÀ TÍNH TOÁN SUPERTREND
+    # 1. CÀI ĐẶT THÔNG SỐ, ĐỒNG BỘ MÚI GIỜ VÀ SUPERTREND
     # ==========================================================
+    # BỘ CHỈNH LỆCH MÚI GIỜ (Tự do tùy chỉnh)
+    # Dữ liệu hiện tại đang đi trước VN 3 tiếng -> Đặt -3 để lùi về giờ chuẩn VN
+    TIME_SHIFT_HOURS = -3 
+    
     VZO_length = 14
     pullback_limit = 15
     atr_period = 10
@@ -113,7 +117,7 @@ def run_indicator(df):
             is_ready_sell = False 
 
     # ==========================================================
-    # 4. TRẢ DỮ LIỆU VỀ STREAMLIT (CHUẨN GIỜ VIỆT NAM GMT+7)
+    # 4. TRẢ DỮ LIỆU VỀ STREAMLIT (SỬ DỤNG BỘ CHỈNH MÚI GIỜ)
     # ==========================================================
     plot_data = {
         "vzo": vzo,
@@ -127,8 +131,8 @@ def run_indicator(df):
         if not np.isnan(buy_signals.iloc[i]):
             try:
                 timestamp = pd.to_datetime(df.index[i])
-                # Dữ liệu gốc là GMT+3, giờ VN là GMT+7 -> Cộng chênh lệch 4 tiếng
-                timestamp_vn = timestamp + pd.Timedelta(hours=4)
+                # Sử dụng biến TIME_SHIFT_HOURS đã cài đặt ở phần 1
+                timestamp_vn = timestamp + pd.Timedelta(hours=TIME_SHIFT_HOURS)
                 time_str = timestamp_vn.strftime('%H:%M:%S %d/%m/%Y')
             except:
                 time_str = str(df.index[i])
@@ -139,8 +143,7 @@ def run_indicator(df):
         elif not np.isnan(sell_signals.iloc[i]):
             try:
                 timestamp = pd.to_datetime(df.index[i])
-                # Dữ liệu gốc là GMT+3, giờ VN là GMT+7 -> Cộng chênh lệch 4 tiếng
-                timestamp_vn = timestamp + pd.Timedelta(hours=4)
+                timestamp_vn = timestamp + pd.Timedelta(hours=TIME_SHIFT_HOURS)
                 time_str = timestamp_vn.strftime('%H:%M:%S %d/%m/%Y')
             except:
                 time_str = str(df.index[i])
