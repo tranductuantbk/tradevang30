@@ -1,79 +1,106 @@
 import pandas as pd
 import numpy as np
 
-def run_indicator(df):
-    d = df.copy()
-    def get_1d(col_name):
-        return d[col_name].iloc[:, 0] if isinstance(d[col_name], pd.DataFrame) else d[col_name]
-
-    close = get_1d('Close')
-    high = get_1d('High')
-    low = get_1d('Low')
-    volume = get_1d('Volume')
-
-    window_len, v_len, macd_slow = 28, 14, 26
-    price_spread = (high - low).rolling(window=window_len).std(ddof=0)
+# Thuật toán Hồi quy tuyến tính (Linear Regression) chuyển từ Pine Script sang Numpy
+def rolling_linreg(s, window):
+    res = np.full(len(s), np.nan)
+    x = np.arange(window)
+    x_mean = (window - 1) / 2.0
+    var_x = np.sum((x - x_mean)**2)
     
-    change = close.diff()
-    sign = np.sign(change)
-    v = (sign * volume).cumsum()
+    s_values = s.values
+    for i in range(window-1, len(s)):
+        y = s_values[i-window+1:i+1]
+        if not np.isnan(y).any():
+            y_mean = np.mean(y)
+            cov = np.sum((x - x_mean) * (y - y_mean))
+            slope = cov / var_x
+            intercept = y_mean - slope * x_mean
+            # Tìm giá trị dự phóng tại điểm hiện tại
+            res[i] = slope * (window - 1) + intercept
+    return pd.Series(res, index=s.index)
+
+def run_indicator(df):
+    # 1. Cài đặt thông số
+    window_len = 28
+    v_len = 14
+    macd_slow = 26
+    
+    close = df['Close']
+    high = df['High']
+    low = df['Low']
+    volume = df['Volume']
+    
+    # 2. Tính toán OBV Chuẩn hóa
+    price_spread = (high - low).rolling(window=window_len).std()
+    
+    # math.sign(ta.change(src1)) * volume
+    sign_change = close.diff().apply(np.sign).fillna(0)
+    v = (sign_change * volume).cumsum()
     
     smooth = v.rolling(window=v_len).mean()
-    v_spread = (v - smooth).rolling(window=window_len).std(ddof=0)
+    v_spread = (v - smooth).rolling(window=window_len).std()
     
-    shadow = np.where(v_spread != 0, (v - smooth) / v_spread * price_spread, 0)
-    shadow_series = pd.Series(shadow, index=d.index)
+    # Tránh lỗi chia cho 0 (divide by zero)
+    v_spread_safe = np.where(v_spread.isna() | (v_spread == 0), 1, v_spread)
+    shadow = np.where(
+        v_spread.isna() | (v_spread == 0), 
+        0, 
+        (v - smooth) / v_spread_safe * price_spread
+    )
     
-    out = np.where(shadow_series > 0, high + shadow_series, low + shadow_series)
+    out = np.where(shadow > 0, high + shadow, low + shadow)
+    out_series = pd.Series(out, index=df.index)
+    
+    obvema = out_series # EMA chu kỳ 1 chính là giá trị gốc
     slow_ma = close.ewm(span=macd_slow, adjust=False).mean()
-    macd_val = pd.Series(out, index=d.index) - slow_ma
-
-    def get_linreg(series, length):
-        x = np.arange(length)
-        x_mean = x.mean()
-        x_diff = x - x_mean
-        sum_x_diff_sq = np.sum(x_diff**2)
-        result = pd.Series(np.nan, index=series.index)
-        y_values = series.values
-        for i in range(length - 1, len(y_values)):
-            y_slice = y_values[i - length + 1 : i + 1]
-            if np.isnan(y_slice).any(): continue
-            y_mean = y_slice.mean()
-            slope = np.sum(x_diff * (y_slice - y_mean)) / sum_x_diff_sq
-            intercept = y_mean - slope * x_mean
-            result.iloc[i] = intercept + slope * (length - 1)
-        return result
-
-    signal_val = get_linreg(macd_val, 5)
-    sma_50 = signal_val.rolling(window=50).mean()
-
-    if len(signal_val) < 50 or pd.isna(sma_50.iloc[-1]):
-        return "Chỉ báo OBV MACD Sniper: Đang tải...", {}
-
-    buy_labels = pd.Series(np.nan, index=d.index)
-    sell_labels = pd.Series(np.nan, index=d.index)
-
+    
+    macd_val = obvema - slow_ma
+    
+    # Tạo đường tín hiệu mượt (Linear Regression Length = 5)
+    signal_val = rolling_linreg(macd_val, 5)
+    
+    # 3. Thuật toán Zero-Lag Hook (Móc câu thời gian thực)
+    hook_up = (signal_val > signal_val.shift(1)) & (signal_val.shift(1) <= signal_val.shift(2))
+    hook_dn = (signal_val < signal_val.shift(1)) & (signal_val.shift(1) >= signal_val.shift(2))
+    
+    sma50 = signal_val.rolling(50).mean()
+    
+    # Logic xác nhận vùng cạn kiệt
+    can_cau = hook_dn & (signal_val.shift(1) > sma50)
+    can_cung = hook_up & (signal_val.shift(1) < sma50)
+    
+    # 4. Lưu nhãn Đỉnh / Đáy (Offset = -1)
+    buy_labels = pd.Series(np.nan, index=df.index)
+    sell_labels = pd.Series(np.nan, index=df.index)
+    
     for i in range(2, len(df)):
-        sig_0, sig_1, sig_2 = signal_val.iloc[i], signal_val.iloc[i-1], signal_val.iloc[i-2]
-        sma50_1 = sma_50.iloc[i-1]
+        if can_cung.iloc[i]:
+            # Đẩy nhãn lùi lại 1 nến để cắm đúng vào chóp đáy
+            buy_labels.iloc[i-1] = signal_val.iloc[i-1]
+        if can_cau.iloc[i]:
+            # Đẩy nhãn lùi lại 1 nến để cắm đúng vào chóp đỉnh
+            sell_labels.iloc[i-1] = signal_val.iloc[i-1]
+            
+    # Gói dữ liệu để đẩy lên biểu đồ Plotly
+    plot_data = {
+        "signal_val": signal_val,
+        "buy_labels": buy_labels,
+        "sell_labels": sell_labels
+    }
+    
+    # 5. Phân tích tín hiệu hiện tại cho Bảng điều khiển (App.py)
+    last_signal = "Bình thường"
+    # Quét 5 nến gần nhất xem có tín hiệu nào không
+    for i in range(len(df)-1, max(0, len(df)-6), -1):
+        if can_cung.iloc[i]:
+            last_signal = "OBV MACD: CẠN MUA (Dòng tiền tạo đáy)"
+            break
+        elif can_cau.iloc[i]:
+            last_signal = "OBV MACD: CẠN BÁN (Dòng tiền tạo đỉnh)"
+            break
+            
+    if last_signal == "Bình thường":
+        last_signal = "OBV MACD: Trạng thái Trung tính"
         
-        hook_up = (sig_0 > sig_1) and (sig_1 <= sig_2)
-        hook_dn = (sig_0 < sig_1) and (sig_1 >= sig_2)
-
-        if hook_dn and (sig_1 > sma50_1): sell_labels.iloc[i-1] = sig_1
-        if hook_up and (sig_1 < sma50_1): buy_labels.iloc[i-1] = sig_1
-
-    sig_0, sig_1, sig_2 = float(signal_val.iloc[-1]), float(signal_val.iloc[-2]), float(signal_val.iloc[-3])
-    sma50_1 = float(sma_50.iloc[-2])
-    
-    can_cau = (sig_0 < sig_1) and (sig_1 >= sig_2) and (sig_1 > sma50_1)
-    can_cung = (sig_0 > sig_1) and (sig_1 <= sig_2) and (sig_1 < sma50_1)
-
-    status = "Tích lũy"
-    if can_cau: status = "🔴 CẠN CẦU (SHORT)"
-    elif can_cung: status = "🟢 CẠN CUNG (LONG)"
-
-    text_for_ai = f"OBV MACD Sniper: {status}"
-    plot_data = {"signal_val": signal_val, "buy_labels": buy_labels, "sell_labels": sell_labels}
-    
-    return text_for_ai, plot_data
+    return last_signal, plot_data
