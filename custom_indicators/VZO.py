@@ -65,18 +65,14 @@ def run_indicator(df):
         supertrend.iloc[i] = final_lb.iloc[i] if macro_trend.iloc[i] == 1 else final_ub.iloc[i]
 
     # ==========================================================
-    # 2. TÍNH TOÁN DÒNG TIỀN VZO (ĐÃ FIX LỖI INDEX/SHAPE)
+    # 2. TÍNH TOÁN DÒNG TIỀN VZO 
     # ==========================================================
     vol_dir = np.where(close > close.shift(1), volume, -volume)
     
-    # Ép buộc dùng chung index của df để chống lệch mảng
     vzo_vol = pd.Series(vol_dir, index=df.index).ewm(span=VZO_length, adjust=False).mean()
     tot_vol = volume.ewm(span=VZO_length, adjust=False).mean()
     
-    # Dùng .values để loại bỏ can thiệp của Pandas index khi tính toán với Numpy
     raw_vzo = np.where(tot_vol.values != 0, 100 * vzo_vol.values / tot_vol.values, 0)
-    
-    # Bọc lại thành Series và gắn index gốc
     vzo = pd.Series(raw_vzo, index=df.index).ewm(span=4, adjust=False).mean()
 
     # ==========================================================
@@ -117,7 +113,7 @@ def run_indicator(df):
             is_ready_sell = False 
 
     # ==========================================================
-    # 4. TRẢ DỮ LIỆU VỀ STREAMLIT
+    # 4. TRẢ DỮ LIỆU VỀ STREAMLIT (NÂNG CẤP XUẤT THỜI GIAN)
     # ==========================================================
     plot_data = {
         "vzo": vzo,
@@ -126,12 +122,18 @@ def run_indicator(df):
     }
     
     last_signal = "Bình thường"
-    for i in range(len(df)-1, max(0, len(df)-6), -1):
-        if not np.isnan(buy_signals.iloc[i]) or not np.isnan(buy_signals.iloc[i-1] if i > 0 else np.nan):
-            last_signal = "VZO: KIỆT SỨC BÁN (Chuẩn bị Tăng lên theo Supertrend)"
+    # Quét ngược từ nến hiện tại về quá khứ 10 nến để bắt mốc thời gian chính xác
+    for i in range(len(df)-1, max(0, len(df)-11), -1):
+        if not np.isnan(buy_signals.iloc[i]):
+            timestamp = df.index[i]
+            # Kiểm tra nếu định dạng là datetime thì format đẹp, nếu là chuỗi thì lấy luôn
+            time_str = timestamp.strftime('%H:%M:%S %d/%m/%Y') if hasattr(timestamp, 'strftime') else str(timestamp)
+            last_signal = f"VZO: Đỉnh Đáy VZO - KIỆT SỨC BÁN lúc {time_str} (Chuẩn bị Tăng theo Supertrend)"
             break
-        elif not np.isnan(sell_signals.iloc[i]) or not np.isnan(sell_signals.iloc[i-1] if i > 0 else np.nan):
-            last_signal = "VZO: KIỆT SỨC MUA (Chuẩn bị Giảm xuống theo Supertrend)"
+        elif not np.isnan(sell_signals.iloc[i]):
+            timestamp = df.index[i]
+            time_str = timestamp.strftime('%H:%M:%S %d/%m/%Y') if hasattr(timestamp, 'strftime') else str(timestamp)
+            last_signal = f"VZO: Đỉnh Đáy VZO - KIỆT SỨC MUA lúc {time_str} (Chuẩn bị Giảm theo Supertrend)"
             break
             
     if last_signal == "Bình thường":
