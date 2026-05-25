@@ -9,9 +9,9 @@ def run_indicator(df):
     # ==========================================================
     # 1. CÀI ĐẶT THÔNG SỐ, ĐỒNG BỘ MÚI GIỜ VÀ SUPERTREND
     # ==========================================================
-    # BỘ CHỈNH LỆCH MÚI GIỜ (Tự do tùy chỉnh)
-    # Dữ liệu hiện tại đang đi trước VN 3 tiếng -> Đặt -3 để lùi về giờ chuẩn VN
-    TIME_SHIFT_HOURS = -3 
+    # BỘ CHỈNH LỆCH MÚI GIỜ
+    # Lùi lại 6 tiếng để khớp đúng 19:15 25/05 trên biểu đồ
+    TIME_SHIFT_HOURS = -6
     
     VZO_length = 14
     pullback_limit = 15
@@ -117,7 +117,7 @@ def run_indicator(df):
             is_ready_sell = False 
 
     # ==========================================================
-    # 4. TRẢ DỮ LIỆU VỀ STREAMLIT (SỬ DỤNG BỘ CHỈNH MÚI GIỜ)
+    # 4. TRẢ DỮ LIỆU VỀ STREAMLIT
     # ==========================================================
     plot_data = {
         "vzo": vzo,
@@ -131,7 +131,6 @@ def run_indicator(df):
         if not np.isnan(buy_signals.iloc[i]):
             try:
                 timestamp = pd.to_datetime(df.index[i])
-                # Sử dụng biến TIME_SHIFT_HOURS đã cài đặt ở phần 1
                 timestamp_vn = timestamp + pd.Timedelta(hours=TIME_SHIFT_HOURS)
                 time_str = timestamp_vn.strftime('%H:%M:%S %d/%m/%Y')
             except:
