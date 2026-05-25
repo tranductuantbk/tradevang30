@@ -26,18 +26,15 @@ st.set_page_config(layout="wide", page_title="Quant Trading Hub", page_icon="⚡
 macro_engine = MacroAnalyzer() 
 
 # ==========================================================
-# 3. GIAO DIỆN CHÍNH (ĐÃ NÂNG CẤP LUỒNG WORKFLOW)
+# 3. GIAO DIỆN CHÍNH
 # ==========================================================
 st.title("⚡ Quant Trading Hub - AI Strategist")
 st.markdown("---")
 
-# Chia màn hình làm 2 cột (Trái nhập liệu - Phải hiển thị)
 c1, c2 = st.columns([1, 1.2])
 
 with c1:
-    # ---------------------------------------------------------
-    # BƯỚC 1: CHỌN DỮ LIỆU ĐẦU VÀO
-    # ---------------------------------------------------------
+    # --- BƯỚC 1: CHỌN DỮ LIỆU ĐẦU VÀO ---
     st.subheader("⚙️ 1. Chọn Dữ liệu Đầu vào")
     
     data_type = st.selectbox("Loại dữ liệu bạn muốn AI phân tích:", 
@@ -45,68 +42,59 @@ with c1:
     
     indicator_data = ""
     
-    # Nếu chọn Chỉ báo hoặc Toàn diện -> Hiện ô nhập Chỉ báo
     if "Chỉ báo" in data_type or "Toàn diện" in data_type:
         indicator_data = st.text_area("📝 Nhập dữ liệu/Tín hiệu Chỉ báo (VD: SQZ PRO báo MUA, OBV MACD tạo đáy...):", height=100)
         
-    # Nếu chọn Vĩ mô hoặc Toàn diện -> Hiện bảng Vĩ mô
     if "Vĩ mô" in data_type or "Toàn diện" in data_type:
         macro_engine.render_ui()
 
-    st.markdown("<br>", unsafe_allow_html=True) # Khoảng trống cho đẹp
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    # ---------------------------------------------------------
-    # BƯỚC 2: CHỌN AI VÀ KÍCH HOẠT
-    # ---------------------------------------------------------
+    # --- BƯỚC 2: CHỌN AI VÀ KÍCH HOẠT ---
     st.subheader("🤖 2. Chọn AI Phân tích")
     
-    # Cho phép chọn Model AI
     ai_choice = st.selectbox("Chọn bộ não AI:", ["Gemini 1.5 Flash (Xử lý Nhanh)", "Gemini 1.5 Pro (Suy luận Sâu)"])
-    
-    # Cho phép nhập mã giao dịch (Linh hoạt cho Vàng, Forex, Cổ phiếu...)
     ticker = st.text_input("Mã giao dịch (Ticker):", value="XAU/USD")
 
     if st.button("🚀 YÊU CẦU AI PHÂN TÍCH NGAY", type="primary", use_container_width=True):
         try:
-            # Cấu hình API Key (Lấy từ file secrets.toml)
             genai.configure(api_key=st.secrets["API_KEY"])
             
-            # Khởi tạo model dựa trên lựa chọn
-            model_name = 'gemini-1.5-pro' if 'Pro' in ai_choice else 'gemini-1.5-flash'
-            model = genai.GenerativeModel(model_name)
+            # --- VÁ LỖI MODEL Ở ĐÂY ---
+            # Thêm '-latest' để tương thích với API v1beta
+            target_model = 'gemini-1.5-pro-latest' if 'Pro' in ai_choice else 'gemini-1.5-flash-latest'
             
-            # Xây dựng Prompt (Lệnh) thông minh tùy theo dữ liệu đầu vào
             prompt = f"Đóng vai là một chuyên gia giao dịch định lượng (Quant Trader). Hãy phân tích mã {ticker} dựa trên các dữ liệu sau:\n"
-            
             if indicator_data:
                 prompt += f"- Dữ liệu Kỹ thuật (Chỉ báo): {indicator_data}\n"
             if "Vĩ mô" in data_type or "Toàn diện" in data_type:
                 prompt += f"- Dữ liệu Vĩ mô: {macro_engine.get_summary()}\n"
-            
-            prompt += "\nTừ các dữ liệu trên, hãy đưa ra nhận định thị trường và xây dựng một kế hoạch giao dịch chuyên nghiệp (bao gồm Điểm vào lệnh, Cắt lỗ, Chốt lời). Trình bày bằng tiếng Việt, chia các gạch đầu dòng rõ ràng để đọc trực tiếp trên ứng dụng web."
+            prompt += "\nTừ các dữ liệu trên, hãy đưa ra nhận định thị trường và xây dựng một kế hoạch giao dịch chuyên nghiệp (bao gồm Điểm vào lệnh, Cắt lỗ, Chốt lời). Trình bày bằng tiếng Việt, chia các gạch đầu dòng rõ ràng."
 
-            # Vòng chờ loading
-            with st.spinner(f"🧠 {ai_choice} đang suy nghĩ và lập kế hoạch..."):
-                response = model.generate_content(prompt)
+            with st.spinner(f"🧠 {ai_choice} đang suy nghĩ..."):
+                try:
+                    model = genai.GenerativeModel(target_model)
+                    response = model.generate_content(prompt)
+                except Exception as model_err:
+                    # Lớp bảo hiểm: Nếu key không hỗ trợ Pro, tự động lùi về Flash
+                    st.warning(f"⚠️ API Key chưa hỗ trợ bản Pro ({model_err}). Tự động chuyển sang bản Flash...")
+                    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+                    response = model.generate_content(prompt)
                 
-                # Lưu kết quả vào bộ nhớ Session để hiển thị ở cột 2
                 st.session_state['ai_report'] = response.text
                 st.session_state['analyzed_ticker'] = ticker
                 st.success("✅ Phân tích hoàn tất! Hãy xem kết quả bên phải.")
                 
         except Exception as e:
-            st.error(f"❌ Lỗi kết nối hoặc API Key: {e}")
+            st.error(f"❌ Lỗi hệ thống: {e}")
 
 with c2:
-    # ---------------------------------------------------------
-    # BƯỚC 3: HIỂN THỊ KẾT QUẢ TRỰC TIẾP TRÊN APP
-    # ---------------------------------------------------------
+    # --- BƯỚC 3: HIỂN THỊ KẾT QUẢ ---
     st.subheader("📋 Kết quả Phân tích từ AI")
     
-    # Trang trí khung kết quả
     with st.container(border=True):
         if 'ai_report' in st.session_state:
             st.info(f"**📈 Kế hoạch giao dịch cho mã:** {st.session_state['analyzed_ticker']}")
             st.markdown(st.session_state['ai_report'])
         else:
-            st.markdown("👈 *Hãy làm theo Bước 1 và Bước 2 ở cột bên trái, AI sẽ trả kết quả trực tiếp vào khung này để bạn đọc luôn!*")
+            st.markdown("👈 *Hãy nhập dữ liệu ở cột bên trái, AI sẽ trả kết quả trực tiếp vào khung này!*")
