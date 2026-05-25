@@ -11,8 +11,8 @@ def run_indicator(df):
     # ==========================================================
     # 1. CÀI ĐẶT THÔNG SỐ & BỘ CHỈNH GIỜ
     # ==========================================================
-    # Lùi lại 6 tiếng để khớp đúng giờ Việt Nam
-    TIME_SHIFT_HOURS = -6
+    # Lùi lại 3 tiếng để khớp với biểu đồ giá đang chạy
+    TIME_SHIFT_HOURS = -3
     
     window_len = 28
     v_len = 14
@@ -81,7 +81,6 @@ def run_indicator(df):
     # ==========================================================
     # 5. TRẢ DỮ LIỆU VỀ STREAMLIT & HIỂN THỊ THỜI GIAN
     # ==========================================================
-    # Đã sửa lại key thành buy_labels và sell_labels để khớp với 1_Chi_bao.py
     plot_data = {
         "signal_val": signal_val,
         "buy_labels": buy_signals,
