@@ -11,7 +11,7 @@ def run_indicator(df):
     # ==========================================================
     # 1. CÀI ĐẶT THÔNG SỐ & BỘ CHỈNH GIỜ
     # ==========================================================
-    # Lùi lại 6 tiếng để khớp đúng giờ Việt Nam (giống file VZO)
+    # Lùi lại 6 tiếng để khớp đúng giờ Việt Nam
     TIME_SHIFT_HOURS = -6
     
     window_len = 28
@@ -26,31 +26,24 @@ def run_indicator(df):
     # ==========================================================
     # 2. TÍNH TOÁN OBV CHUẨN HÓA VÀ BÓNG NẾN (SHADOW)
     # ==========================================================
-    # price_spread = ta.stdev(high - low, window_len) (ddof=0 để khớp với thuật toán TradingView)
+    # Sử dụng std(ddof=0) để khớp tuyệt đối với thuật toán TradingView
     price_spread = (high - low).rolling(window=window_len).std(ddof=0)
     
-    # v = ta.cum(math.sign(ta.change(src1)) * volume)
     change = close.diff()
     sign = np.sign(change)
     v = (sign * volume).cumsum()
     
-    # smooth = ta.sma(v, v_len)
     smooth = v.rolling(window=v_len).mean()
     
-    # v_spread = ta.stdev(v - smooth, window_len)
     v_spread = (v - smooth).rolling(window=window_len).std(ddof=0)
     
-    # shadow = v_spread != 0 ? (v - smooth) / v_spread * price_spread : 0
     shadow = np.where(v_spread != 0, (v - smooth) / v_spread * price_spread, 0)
     shadow_series = pd.Series(shadow, index=df.index)
     
-    # out = shadow > 0 ? high + shadow : low + shadow
     out = np.where(shadow_series > 0, high + shadow_series, low + shadow_series)
     
-    # obvema = ta.ema(out, 1) -> Độ dài 1 chính là giá trị gốc
     obvema = pd.Series(out, index=df.index)
     
-    # slow_ma = ta.ema(close, macd_slow)
     slow_ma = close.ewm(span=macd_slow, adjust=False).mean()
     
     # ==========================================================
@@ -58,7 +51,6 @@ def run_indicator(df):
     # ==========================================================
     macd_val = obvema - slow_ma
     
-    # signal_val = ta.linreg(macd_val, 5, 0)
     signal_val = macd_val.rolling(window=5).apply(linreg_end, raw=True)
     
     # Thuật toán bắt đỉnh/đáy (Hook) thời gian thực
@@ -80,7 +72,6 @@ def run_indicator(df):
     buy_signals = pd.Series(np.nan, index=df.index)
     sell_signals = pd.Series(np.nan, index=df.index)
     
-    # Logic: Nếu nến hiện tại xác nhận móc câu (hook), tín hiệu thực chất thuộc về nến trước đó (chóp đỉnh/đáy)
     for i in range(2, len(df)):
         if can_cung.iloc[i]:
             buy_signals.iloc[i-1] = signal_val.iloc[i-1]
@@ -90,10 +81,11 @@ def run_indicator(df):
     # ==========================================================
     # 5. TRẢ DỮ LIỆU VỀ STREAMLIT & HIỂN THỊ THỜI GIAN
     # ==========================================================
+    # Đã sửa lại key thành buy_labels và sell_labels để khớp với 1_Chi_bao.py
     plot_data = {
         "signal_val": signal_val,
-        "buy_signals": buy_signals,
-        "sell_signals": sell_signals
+        "buy_labels": buy_signals,
+        "sell_labels": sell_signals
     }
     
     last_signal = "Bình thường"
