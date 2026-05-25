@@ -1,100 +1,72 @@
 import streamlit as st
-import google.generativeai as genai
 
 # ==========================================================
-# 1. ĐỊNH NGHĨA MODULE VĨ MÔ
-# ==========================================================
-class MacroAnalyzer:
-    def __init__(self):
-        self.factors = {"FED_Rate": "Neutral", "Geopolitics": "Stable", "USD_DXY": 105.0}
-
-    def render_ui(self):
-        st.markdown("**🌍 Tùy chỉnh Dữ liệu Vĩ mô (Tùy chọn)**")
-        c1, c2, c3 = st.columns(3)
-        with c1: self.factors["FED_Rate"] = st.selectbox("Xu hướng FED:", ["Hawkish", "Dovish", "Neutral"])
-        with c2: self.factors["Geopolitics"] = st.selectbox("Căng thẳng ĐC:", ["High Tension", "Stable", "War Risk"])
-        with c3: self.factors["USD_DXY"] = st.number_input("Giá trị DXY:", value=105.0, step=0.1)
-        return self.factors
-
-    def get_summary(self):
-        return f"- Chính sách FED: {self.factors['FED_Rate']}, Địa chính trị: {self.factors['Geopolitics']}, Chỉ số DXY: {self.factors['USD_DXY']}"
-
-# ==========================================================
-# 2. CẤU HÌNH TRANG & API KHỞI TẠO
+# CẤU HÌNH TRANG
 # ==========================================================
 st.set_page_config(layout="wide", page_title="Quant Trading Hub", page_icon="⚡")
-macro_engine = MacroAnalyzer() 
 
-# ==========================================================
-# 3. GIAO DIỆN CHÍNH
-# ==========================================================
-st.title("⚡ Quant Trading Hub - AI Strategist")
+st.title("⚡ Quant Trading Hub - Bảng Điều Khiển Tín Hiệu")
 st.markdown("---")
 
 c1, c2 = st.columns([1, 1.2])
 
 with c1:
-    # --- BƯỚC 1: CHỌN DỮ LIỆU ĐẦU VÀO ---
-    st.subheader("⚙️ 1. Chọn Dữ liệu Đầu vào")
+    st.subheader("⚙️ 1. Nguồn Dữ Liệu Chỉ Báo")
     
-    data_type = st.selectbox("Loại dữ liệu bạn muốn AI phân tích:", 
-        ["Dữ liệu Chỉ báo (Technical)", "Dữ liệu Vĩ mô (Macro)", "Phân tích Toàn diện (Kỹ thuật + Vĩ mô)"])
+    # Tự động lấy dữ liệu từ trang 1_Chi_bao.py (nếu bạn đang chạy bên đó)
+    auto_data = st.session_state.get('tech_indicators', '')
     
-    indicator_data = ""
+    indicator_data = st.text_area(
+        "📝 Dữ liệu hiện tại (Tự động đồng bộ hoặc bạn có thể nhập tay):", 
+        value=auto_data, 
+        height=200,
+        help="Ví dụ: SQZ PRO: QUÁ MUA\nOBV MACD: CẠN BÁN"
+    )
     
-    if "Chỉ báo" in data_type or "Toàn diện" in data_type:
-        indicator_data = st.text_area("📝 Nhập dữ liệu/Tín hiệu Chỉ báo (VD: SQZ PRO báo MUA, OBV MACD tạo đáy...):", height=100)
-        
-    if "Vĩ mô" in data_type or "Toàn diện" in data_type:
-        macro_engine.render_ui()
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # --- BƯỚC 2: CHỌN AI VÀ KÍCH HOẠT ---
-    st.subheader("🤖 2. Chọn AI Phân tích")
-    
-    ai_choice = st.selectbox("Chọn bộ não AI:", ["Gemini 1.5 Flash (Xử lý Nhanh)", "Gemini 1.5 Pro (Suy luận Sâu)"])
-    ticker = st.text_input("Mã giao dịch (Ticker):", value="XAU/USD")
-
-    if st.button("🚀 YÊU CẦU AI PHÂN TÍCH NGAY", type="primary", use_container_width=True):
-        try:
-            genai.configure(api_key=st.secrets["API_KEY"])
-            
-            # --- VÁ LỖI MODEL Ở ĐÂY ---
-            # Thêm '-latest' để tương thích với API v1beta
-            target_model = 'gemini-1.5-pro-latest' if 'Pro' in ai_choice else 'gemini-1.5-flash-latest'
-            
-            prompt = f"Đóng vai là một chuyên gia giao dịch định lượng (Quant Trader). Hãy phân tích mã {ticker} dựa trên các dữ liệu sau:\n"
-            if indicator_data:
-                prompt += f"- Dữ liệu Kỹ thuật (Chỉ báo): {indicator_data}\n"
-            if "Vĩ mô" in data_type or "Toàn diện" in data_type:
-                prompt += f"- Dữ liệu Vĩ mô: {macro_engine.get_summary()}\n"
-            prompt += "\nTừ các dữ liệu trên, hãy đưa ra nhận định thị trường và xây dựng một kế hoạch giao dịch chuyên nghiệp (bao gồm Điểm vào lệnh, Cắt lỗ, Chốt lời). Trình bày bằng tiếng Việt, chia các gạch đầu dòng rõ ràng."
-
-            with st.spinner(f"🧠 {ai_choice} đang suy nghĩ..."):
-                try:
-                    model = genai.GenerativeModel(target_model)
-                    response = model.generate_content(prompt)
-                except Exception as model_err:
-                    # Lớp bảo hiểm: Nếu key không hỗ trợ Pro, tự động lùi về Flash
-                    st.warning(f"⚠️ API Key chưa hỗ trợ bản Pro ({model_err}). Tự động chuyển sang bản Flash...")
-                    model = genai.GenerativeModel('gemini-1.5-flash-latest')
-                    response = model.generate_content(prompt)
-                
-                st.session_state['ai_report'] = response.text
-                st.session_state['analyzed_ticker'] = ticker
-                st.success("✅ Phân tích hoàn tất! Hãy xem kết quả bên phải.")
-                
-        except Exception as e:
-            st.error(f"❌ Lỗi hệ thống: {e}")
+    analyze_btn = st.button("🚀 ĐỌC TRẠNG THÁI HIỆN TẠI", type="primary", use_container_width=True)
 
 with c2:
-    # --- BƯỚC 3: HIỂN THỊ KẾT QUẢ ---
-    st.subheader("📋 Kết quả Phân tích từ AI")
+    st.subheader("📋 Trạng Thái Biểu Đồ Thực Tế")
     
-    with st.container(border=True):
-        if 'ai_report' in st.session_state:
-            st.info(f"**📈 Kế hoạch giao dịch cho mã:** {st.session_state['analyzed_ticker']}")
-            st.markdown(st.session_state['ai_report'])
-        else:
-            st.markdown("👈 *Hãy nhập dữ liệu ở cột bên trái, AI sẽ trả kết quả trực tiếp vào khung này!*")
+    if analyze_btn or indicator_data:
+        with st.container(border=True):
+            if not indicator_data.strip():
+                st.warning("Chưa có dữ liệu. Vui lòng bật các chỉ báo bên trang biểu đồ hoặc nhập dữ liệu vào ô bên trái.")
+            else:
+                st.markdown("### 📊 Chi tiết Tín hiệu")
+                lines = indicator_data.split('\n')
+                
+                buy_count = 0
+                sell_count = 0
+                
+                # Vòng lặp đọc "như thế nào thể hiện thế đó"
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                        
+                    text_upper = line.upper()
+                    # Quét từ khóa để tô màu hiển thị
+                    if any(kw in text_upper for kw in ["MUA", "CẠN CUNG", "QUÁ BÁN", "TĂNG"]):
+                        st.success(f"🟢 **{line}**")
+                        buy_count += 1
+                    elif any(kw in text_upper for kw in ["BÁN", "CẠN CẦU", "QUÁ MUA", "GIẢM"]):
+                        st.error(f"🔴 **{line}**")
+                        sell_count += 1
+                    else:
+                        st.info(f"⚪ **{line}**")
+                        
+                st.markdown("---")
+                st.markdown("### 🎯 Kết luận chung")
+                
+                # Tổng hợp trạng thái
+                if buy_count > sell_count:
+                    st.success(f"🔥 **ƯU TIÊN TÌM ĐIỂM MUA** (Có {buy_count} tín hiệu ủng hộ MUA / {sell_count} tín hiệu BÁN)")
+                elif sell_count > buy_count:
+                    st.error(f"🩸 **ƯU TIÊN TÌM ĐIỂM BÁN** (Có {sell_count} tín hiệu ủng hộ BÁN / {buy_count} tín hiệu MUA)")
+                elif buy_count == 0 and sell_count == 0:
+                    st.info("🔎 **CHƯA CÓ TÍN HIỆU ĐẢO CHIỀU** - Giá đang chạy theo xu hướng cũ hoặc đi ngang.")
+                else:
+                    st.warning(f"⚖️ **TÍN HIỆU XUNG ĐỘT (TRUNG TÍNH)** - Tỉ lệ MUA/BÁN đang là {buy_count}/{sell_count}. Nên đứng ngoài quan sát thêm.")
+    else:
+        st.markdown("👈 *Dữ liệu sẽ hiển thị trực tiếp tại đây mà không cần chờ AI phân tích.*")
