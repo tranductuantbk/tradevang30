@@ -11,11 +11,13 @@ import numpy as np
 
 st.set_page_config(page_title="Module Chỉ Báo", layout="wide", initial_sidebar_state="collapsed")
 
-# ĐÃ XÓA BỎ LỚP BẢO VỆ ĐĂNG NHẬP (PASSWORD/LOGIN) TẠI ĐÂY
+# Đã gỡ bỏ hoàn toàn lớp bảo vệ đăng nhập theo yêu cầu trước của bạn
 
 st_autorefresh(interval=60000, key="live_refresh")
 
+# BỔ SUNG KHUNG M5 VÀO ĐẦU DANH SÁCH KHUNG THỜI GIAN
 tf_mapping = {
+    "M5":  {"yf_interval": "5m",  "yf_period": "1mo", "td_interval": "5min"},
     "M15": {"yf_interval": "15m", "yf_period": "1mo", "td_interval": "15min"},
     "M30": {"yf_interval": "30m", "yf_period": "1mo", "td_interval": "30min"},
     "H1":  {"yf_interval": "60m", "yf_period": "1mo", "td_interval": "1h"},
@@ -28,7 +30,8 @@ API_KEY = "cf03fc875ee64027a947ccab5ceced4b"
 
 col_t, col_m, col_f = st.columns([2, 1, 1])
 with col_m: selected_ticker = st.text_input("📈 Mã Giao dịch:", value="XAU/USD")
-with col_f: selected_tf = st.selectbox("⏳ Khung thời gian:", list(tf_mapping.keys()), index=1)
+# ĐỔI INDEX THÀNH 0 ĐỂ MẶC ĐỊNH CHỌN M5 KHI TẢI TRANG
+with col_f: selected_tf = st.selectbox("⏳ Khung thời gian:", list(tf_mapping.keys()), index=0)
 
 @st.cache_data(ttl=60)
 def load_data(ticker, tf_label, api_key):
