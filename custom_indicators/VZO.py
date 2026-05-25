@@ -113,7 +113,7 @@ def run_indicator(df):
             is_ready_sell = False 
 
     # ==========================================================
-    # 4. TRẢ DỮ LIỆU VỀ STREAMLIT (GIỜ VIỆT NAM + ĐỔI TÊN)
+    # 4. TRẢ DỮ LIỆU VỀ STREAMLIT (GIỜ GỐC CHUẨN XÁC)
     # ==========================================================
     plot_data = {
         "vzo": vzo,
@@ -127,9 +127,7 @@ def run_indicator(df):
         if not np.isnan(buy_signals.iloc[i]):
             try:
                 timestamp = pd.to_datetime(df.index[i])
-                # Ép sang giờ VN (cộng 7 tiếng). Nếu dữ liệu API tải về đã là giờ VN, bạn chỉ cần sửa + pd.Timedelta(hours=0)
-                timestamp_vn = timestamp + pd.Timedelta(hours=7) 
-                time_str = timestamp_vn.strftime('%H:%M:%S %d/%m/%Y')
+                time_str = timestamp.strftime('%H:%M:%S %d/%m/%Y')
             except:
                 time_str = str(df.index[i])
                 
@@ -139,8 +137,7 @@ def run_indicator(df):
         elif not np.isnan(sell_signals.iloc[i]):
             try:
                 timestamp = pd.to_datetime(df.index[i])
-                timestamp_vn = timestamp + pd.Timedelta(hours=7)
-                time_str = timestamp_vn.strftime('%H:%M:%S %d/%m/%Y')
+                time_str = timestamp.strftime('%H:%M:%S %d/%m/%Y')
             except:
                 time_str = str(df.index[i])
                 
